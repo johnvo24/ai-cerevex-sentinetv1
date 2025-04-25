@@ -1,0 +1,26 @@
+data:
+  ag_news: "wangrongsheng/ag_news"
+
+input:
+  max_seq_length: 128
+  num_classes: 4
+
+finetune:
+  name: "bert-base-uncased"
+  batch_size: 32
+  learning_rate: 5e-5
+  epochs: 100
+  save_model_path: "model/"
+
+training:
+  early_stopping: True
+  patience: 3  # Số epoch không cải thiện để dừng huấn luyện
+  use_gpu: True
+  gpu_device: 0  # ID của GPU nếu có
+
+logging:
+  log_dir: "log/"
+  log_level: "INFO"
+
+other:
+  seed: 42  # Cố định seed để kết quả có thể tái tạo
