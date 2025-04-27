@@ -18,6 +18,9 @@ training:
   use_gpu: True
   gpu_device: 0  # ID của GPU nếu có
 
+rl_training:
+  episode: 5000
+
 logging:
   log_dir: "log/"
   log_level: "INFO"
