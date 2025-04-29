@@ -7,9 +7,9 @@ input:
 
 finetune:
   name: "bert-base-uncased"
-  batch_size: 32
-  learning_rate: 5e-5
-  epochs: 100
+  batch_size: 16
+  learning_rate: 0.00002
+  epochs: 3
   save_model_path: "model/"
 
 training:
