@@ -14,9 +14,9 @@ finetune:
 
 training:
   early_stopping: True
-  patience: 3  # Số epoch không cải thiện để dừng huấn luyện
+  patience: 3
   use_gpu: True
-  gpu_device: 0  # ID của GPU nếu có
+  gpu_device: 0
 
 rl_training:
   episode: 5000
@@ -26,4 +26,4 @@ logging:
   log_level: "INFO"
 
 other:
-  seed: 42  # Cố định seed để kết quả có thể tái tạo
+  seed: 42
