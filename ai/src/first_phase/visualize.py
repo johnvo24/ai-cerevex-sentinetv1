@@ -1,7 +1,6 @@
 from datasets import load_dataset
 import matplotlib.pyplot as plt
 from collections import Counter
-from sklearn.decomposition import PCA
 import numpy as np
 import os
 import yaml
@@ -103,54 +102,6 @@ def length_boxplot(train_lengths, test_lengths):
         plt.close()
         print("Saved title length boxplot.")
 
-def embedding_space(data, title, output_dir):
-    from transformers import BertTokenizer, BertModel
-
-    print("Loading model, tokenizer...")
-    tokenizer = BertTokenizer.from_pretrained(model_name)
-    model = BertModel.from_pretrained(model_name)
-    pca = PCA(n_components=2)
-    model.eval()
-
-    print("Generating embeddings...")
-    vectors = tokenizer(data['text'], padding=True, truncation=True, max_length=max_len, return_tensors='pt')
-
-    cls_embs = []
-    labels = []
-
-    print("Generating embedding space...")
-    for sample in vectors:
-        with torch.no_grad():
-            output = model(sample['input_ids'], sample['attention_mask'])
-            cls_emb = output.last_hidden_state[:, 0, :]
-            cls_embs.append(cls_emb)
-            labels.append(sample['label'])
-
-    cls_embs = np.array(cls_embs)
-    labels = np.array(labels)
-
-    emb_2d = pca.fit_transform(cls_embs)
-
-    print('Plotting...')
-    label_names = ["World", "Sports", "Business", "Sci/Tech"]
-    colors = ["red", "blue", "green", "orange"]
-
-    plt.figure(figsize=(10,8))
-    for label in np.unique(labels):
-        idx = labels == label
-        plt.scatter(emb_2d[idx, 0], emb_2d[idx, 1], c=colors[label], label=label_names[label], alpha=0.6)
-    plt.legend()
-    plt.title(title)
-    plt.xlabel("PC1")
-    plt.ylabel("PC2")
-    plt.grid(True)
-
-    plt.savefig(output_dir)
-    plt.close()
-    print("Saved 2D embedding plot!")
-
-# distribution_plot(x_train, y_train, x_test, y_test)
-# length_histogram(train_lengths, test_lengths)
-# length_boxplot(train_lengths, test_lengths)
-embedding_space(train_data, 'BERT Embedding Space of AG News Training Set', 'res/ag_news_train_embedding_space.png')
-embedding_space(test_data, 'BERT Embedding Space of AG News Test Set', 'res/ag_news_test_embedding_space.png')
+distribution_plot(x_train, y_train, x_test, y_test)
+length_histogram(train_lengths, test_lengths)
+length_boxplot(train_lengths, test_lengths)
