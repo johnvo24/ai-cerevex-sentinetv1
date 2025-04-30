@@ -16,13 +16,16 @@ def load_config(config_path='config.yaml'):
             print(exc)
 config = load_config()
 episode = config['rl_training']['episode']
+max_len = config['input']['max_seq_length']
+learning_rate = config['rl_training']['learning_rate']
+action_read = config['rl_training']['action_read']
+action_predict = config['rl_training']['action_predict']
     
 # Load dataset
 print('Loading dataset...')
 dataset = load_dataset(config['data']['ag_news'])
-train_data = dataset['train'][:32]
-test_data = dataset['test'][:32]
-print(train_data)
+train_data = dataset['train']
+test_data = dataset['test']
 
 # Load SFT model
 print('Loading SFT model...')
@@ -30,10 +33,10 @@ model = BertForSequenceClassification.from_pretrained('model/checkpoint-3', num_
 tokenizer = BertTokenizer.from_pretrained('model/checkpoint-3')
 
 # Init RL
-optimizer = AdamW(model.parameters(), lr=5e-5)
+optimizer = AdamW(model.parameters(), lr=learning_rate)
 actor_critic = ActorCritic(model)
 ppo = PPO(actor_critic, optimizer)
-env = TextEnv(train_data, tokenizer, max_seq_length=128)
+env = TextEnv(train_data, model, tokenizer)
 
 # Start training
 print('Start training...')
@@ -46,7 +49,7 @@ for ep in tqdm(range(episode), desc='Episode'):
         action_probs, _ = actor_critic(state) 
         action = torch.multinomial(action_probs, 1)
 
-        next_state, reward, done, _ = env.step(action)
+        next_state, reward, done = env.step(action)
         total_reward += reward
 
         ppo.update(state, action, reward, next_state)

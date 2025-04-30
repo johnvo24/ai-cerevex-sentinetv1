@@ -1,19 +1,22 @@
 import torch
 import torch.nn as nn
 
+
 class ActorCritic(nn.Module):
     def __init__(self, model=None):
         super(ActorCritic, self).__init__()
         self.model = model
-        self.actor = nn.Linear(768, 4)
+        self.actor = nn.Linear(768, 2)
         self.critic = nn.Linear(768, 1)
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
-        output = self.model(x)
-        hidden_state = output[1] # CLS
+        output = self.model(x, output_hidden_states=True)
+        hidden_state = output.hidden_states[-1]
+        cls_token = hidden_state[:, 0, :]
 
-        action_probs = torch.softmax(self.actor(hidden_state), dim=-1)
-        state_value = self.critic(hidden_state)
+        action_probs = self.softmax(self.actor(cls_token))
+        state_value = self.critic(cls_token)
 
         return action_probs, state_value
 
@@ -27,12 +30,14 @@ class PPO:
         action_probs, state_values = self.actorcritic(states)
         old_action_probs = action_probs.detach()
 
-        adv = rewards - state_value.detach()
-        ratio = action_probs.gather(1, actions.unsqueeze(-1)) / old_action_probs.gather(1, actions.unsqueeze(-1))
+        adv = rewards - state_values.detach()
+        ratio = action_probs.gather(1, actions) / old_action_probs.gather(1, actions)
+
+        print(f'adv: {adv}, ratio: {ratio}')
 
         obj = adv*ratio
         obj_clipped = adv*torch.clamp(ratio, 1-self.clip_param, 1+self.clip_param)
-        loss -= torch.min(obj, obj_clipped).mean()
+        loss = -torch.min(obj, obj_clipped).mean()
 
         return loss
 

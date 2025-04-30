@@ -20,6 +20,14 @@ training:
 
 rl_training:
   episode: 5000
+  learning_rate: 0.000005
+  action_read: 0
+  action_predict: 1
+  penalty_read: -0.01
+  penalty_predict_at_the_end: -0.5
+  penalty_predict: -1
+  reward_predict: 1
+  reward_predict_at_the_end: 0.5
 
 logging:
   log_dir: "log/"
