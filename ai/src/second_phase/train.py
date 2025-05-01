@@ -16,10 +16,10 @@ def load_config(config_path='config.yaml'):
             print(exc)
 config = load_config()
 episode = config['rl_training']['episode']
-max_len = config['input']['max_seq_length']
 learning_rate = config['rl_training']['learning_rate']
-action_read = config['rl_training']['action_read']
-action_predict = config['rl_training']['action_predict']
+batch_size = config['rl_training']['batch_size']
+clip_ratio = config['rl_training']['clip_ratio']
+SFT_model_path = config['rl_training']['SFT_model_path']
     
 # Load dataset
 print('Loading dataset...')
@@ -29,30 +29,40 @@ test_data = dataset['test']
 
 # Load SFT model
 print('Loading SFT model...')
-model = BertForSequenceClassification.from_pretrained('model/checkpoint-3', num_labels=4)
-tokenizer = BertTokenizer.from_pretrained('model/checkpoint-3')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = BertForSequenceClassification.from_pretrained(SFT_model_path, num_labels=4)
+tokenizer = BertTokenizer.from_pretrained(SFT_model_path)
 
 # Init RL
-optimizer = AdamW(model.parameters(), lr=learning_rate)
 actor_critic = ActorCritic(model)
-ppo = PPO(actor_critic, optimizer)
-env = TextEnv(train_data, model, tokenizer)
+actor_critic.to(device)
+optimizer = AdamW(actor_critic.parameters(), lr=learning_rate)
+ppo = PPO(actor_critic, optimizer, clip_ratio)
+env = TextEnv(train_data, model, tokenizer, device)
 
 # Start training
 print('Start training...')
 for ep in tqdm(range(episode), desc='Episode'):
     state = env.reset()
-    total_reward = 0
-    done = False
 
-    while not done:
-        action_probs, _ = actor_critic(state) 
-        action = torch.multinomial(action_probs, 1)
+    for sentence in range(batch_size*4):
+        done = False
+        total_reward = 0
 
-        next_state, reward, done = env.step(action)
-        total_reward += reward
+        while not done:
+            state = state.to(device)
+            action_probs, _ = actor_critic(state) 
+            action = torch.multinomial(action_probs, 1)
 
-        ppo.update(state, action, reward, next_state)
-        state = next_state
+            next_state, reward, done = env.step(action)
+            total_reward += reward
 
-    tqdm.write(f"Episode {episode}, Total Reward: {total_reward}")  # Show episode result
+            ppo.update(state, action, reward, next_state)
+            state = next_state
+
+        state = env.next_sentence()
+        tqdm.write(f"Episode {ep+1}/{episode}, Batch {sentence+1}/{batch_size*4}, Total Reward: {total_reward}")  # Show episode result
+
+# Save policy model
+print('Saving policy model...')
+torch.save(actor_critic.state_dict(), 'model/actor_critic.pt')

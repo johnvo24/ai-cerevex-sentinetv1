@@ -2,6 +2,8 @@ import gym
 import torch
 import torch.nn as nn
 import yaml
+import random
+from collections import defaultdict, Counter
 
 
 # Load config
@@ -19,16 +21,41 @@ reward_predict_at_the_end = config['rl_training']['reward_predict_at_the_end']
 penalty_predict = config['rl_training']['penalty_predict']
 penalty_predict_at_the_end = config['rl_training']['penalty_predict_at_the_end']
 penalty_read = config['rl_training']['penalty_read']
+batch_size = config['rl_training']['batch_size']
+
+def split_dataset(dataset, samples_per_class=1250):
+    # Group samples by label
+    label_groups = defaultdict(list)
+    for i, example in enumerate(dataset):
+        label_groups[example['label']].append(i)
+
+    # Sample equal number from each class
+    balanced_indices = []
+
+    for label, indices in label_groups.items():
+        sampled = random.sample(indices, samples_per_class)
+        balanced_indices.extend(sampled)
+
+    # Final balanced subset
+    balanced_subset = dataset.select(balanced_indices)
+
+    # check
+    labels = [ex["label"] for ex in balanced_subset]
+    print(Counter(labels))  # Output should be: {0:1250, 1:1250, 2:1250, 3:1250}
+    print(len(balanced_subset))
+
+    return balanced_subset
 
 class TextEnv(gym.Env):
-    def __init__(self, dataset, model, tokenizer):
-        self.dataset = dataset
+    def __init__(self, dataset, model, tokenizer, device):
+        self.dataset = split_dataset(dataset, samples_per_class=batch_size)
         self.model = model
         self.tokenizer = tokenizer
         self.current_dataset_index = 0
         self.current_sentence_index = 0
         self.word_chunk = [self.dataset['text'][self.current_dataset_index].split(' ')[self.current_sentence_index]]
         self.softmax = nn.Softmax(dim=1)
+        self.device = device
         # self.action_space = gym.spaces.Discrete(2)
         # self.observation_space = gym.spaces.Discrete(self.max_seq_length)
 
@@ -38,10 +65,19 @@ class TextEnv(gym.Env):
         self.word_chunk = [self.dataset['text'][self.current_dataset_index].split(' ')[self.current_sentence_index]]
         return self._get_state(self.word_chunk)
 
+    def next_sentence(self):
+        self.current_dataset_index += 1
+        self.current_sentence_index = 0
+        if self.current_dataset_index == len(self.dataset):
+            return None
+
+        self.word_chunk = [self.dataset['text'][self.current_dataset_index].split(' ')[self.current_sentence_index]]
+        return self._get_state(self.word_chunk)
+
     def _get_state(self, word_chunk):
         text = ' '.join(word_chunk)
         encoded = self.tokenizer(text, padding=False, return_tensors='pt')
-        return encoded['input_ids']
+        return encoded['input_ids'].to(self.device)
 
     def step(self, action):
         max_len = len(self.dataset['text'][self.current_dataset_index].split(' '))
