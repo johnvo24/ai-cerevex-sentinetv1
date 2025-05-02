@@ -41,62 +41,58 @@ def split_dataset(dataset, samples_per_class=1250):
 
     # check
     labels = [ex["label"] for ex in balanced_subset]
-    print(Counter(labels))  # Output should be: {0:1250, 1:1250, 2:1250, 3:1250}
-    print(len(balanced_subset))
 
     return balanced_subset
 
 class TextEnv(gym.Env):
-    def __init__(self, dataset, model, tokenizer, device, k):
-        self.dataset = split_dataset(dataset, samples_per_class=num_data)
+    def __init__(self, tokens, labels, model, k, device):
+        self.tokens = tokens
+        self.labels = labels
         self.model = model
-        self.tokenizer = tokenizer
-        self.current_dataset_index = 0
-        self.current_sentence_index = 0
+        self.current_tokens_index = 0
+        self.current_token_index = 0
         self.k = k
-        self.word_chunk = [self.dataset['text'][self.current_dataset_index].split(' ')[self.current_sentence_index]]
+        self.token_chunk = [self.tokens[self.current_tokens_index][self.current_token_index]]
         self.softmax = nn.Softmax(dim=1)
         self.device = device
-        # self.action_space = gym.spaces.Discrete(2)
-        # self.observation_space = gym.spaces.Discrete(self.max_seq_length)
 
     def reset(self):
         self.current_dataset_index = 0
         self.current_sentence_index = 0
-        self.word_chunk = [self.dataset['text'][self.current_dataset_index].split(' ')[0]]
-        return self._get_state(self.word_chunk)
+        self.token_chunk = [self.tokens[self.current_tokens_index][self.current_token_index]]
+        return self._get_state(self.token_chunk)
 
     def next_sentence(self):
         self.current_dataset_index += 1
         self.current_sentence_index = 0
 
-        if self.current_dataset_index == len(self.dataset):
+        if self.current_tokens_index == len(self.tokens):
             return None
 
-        self.word_chunk = [self.dataset['text'][self.current_dataset_index].split(' ')[0]]
-        return self._get_state(self.word_chunk)
+        self.token_chunk = [self.tokens[self.current_tokens_index][self.current_token_index]]
+        return self._get_state(self.token_chunk)
 
-    def _get_state(self, word_chunk):
-        text = ' '.join(word_chunk)
-        encoded = self.tokenizer(text, padding=False, return_tensors='pt')
-        return encoded['input_ids'].to(self.device)
+    def _get_state(self, chunk):
+        if isinstance(chunk, torch.Tensor):
+            return chunk.unsqueeze(0).to(self.device)
+        else:
+            return torch.tensor(chunk, dtype=torch.long).unsqueeze(0).to(self.device)
 
     def step(self, action):
-        print('Start')
-        max_len = len(self.dataset['text'][self.current_dataset_index].split(' '))
-        true_action = self.dataset['label'][self.current_dataset_index]
-        print('Stop')
+        chunk = self.tokens[self.current_tokens_index]
+        max_len = len(chunk)
+        true_action = self.labels[self.current_tokens_index]
 
         # Continue Reading
         if action == action_read:
-            if len(self.word_chunk) < max_len: # Continue read
+            if len(self.token_chunk) < max_len: # Continue read
                 reward = penalty_read
-                self.current_sentence_index = min(self.current_sentence_index + self.k, max_len - 1)
-                self.word_chunk = self.dataset['text'][self.current_dataset_index].split(' ')[:self.current_sentence_index + 1]
+                self.current_token_index = min(self.current_token_index + self.k, max_len - 1)
+                self.token_chunk = chunk[:self.current_token_index + 1]
                 done = False
 
             else: # Force predict, reach the end
-                predict = self.model(self._get_state(self.word_chunk))
+                predict = self.model(self._get_state(self.token_chunk))
                 predict = self.softmax(predict.logits)
                 label = torch.argmax(predict, dim=-1)
 
@@ -108,11 +104,11 @@ class TextEnv(gym.Env):
 
         # Predict action
         else:
-            predict = self.model(self._get_state(self.word_chunk))
+            predict = self.model(self._get_state(self.token_chunk))
             predict = self.softmax(predict.logits)
             label = torch.argmax(predict, dim=-1)
 
-            if max_len > len(self.word_chunk): # Early predict
+            if max_len > len(self.token_chunk): # Early predict
                 if label == true_action:
                     reward = reward_predict
                 else:
@@ -124,5 +120,5 @@ class TextEnv(gym.Env):
                     reward = penalty_predict_at_the_end
             done = True
 
-        next_state = self._get_state(self.word_chunk)
+        next_state = self._get_state(self.token_chunk)
         return next_state, reward, done

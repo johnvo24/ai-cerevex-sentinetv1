@@ -1,6 +1,7 @@
 import torch
+import time
 from transformers import BertTokenizer, BertForSequenceClassification
-from environment import TextEnv
+from environment import TextEnv, split_dataset
 from torch.optim import AdamW
 from datasets import load_dataset
 from reinforcement_learning import PPO, ActorCritic
@@ -22,17 +23,24 @@ clip_ratio = config['rl_training']['clip_ratio']
 SFT_model_path = config['rl_training']['SFT_model_path']
 k = config['rl_training']['k']
     
-# Load dataset
-print('Loading dataset...')
-dataset = load_dataset(config['data']['ag_news'])
-train_data = dataset['train']
-test_data = dataset['test']
-
 # Load SFT model
 print('Loading SFT model...')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = BertForSequenceClassification.from_pretrained(SFT_model_path, num_labels=4)
 tokenizer = BertTokenizer.from_pretrained(SFT_model_path)
+
+# Load dataset
+print('Loading dataset...')
+dataset = load_dataset(config['data']['ag_news'])
+print('Tokenizing dataset...')
+train_data = split_dataset(dataset['train'], samples_per_class=num_data)
+train_token = tokenizer(train_data['text'], padding=False, return_tensors=None)
+train_token = [torch.tensor(token).to(device) for token in train_token['input_ids']]
+train_label = torch.tensor(train_data['label'])
+train_label = train_label.to(device)
+# test_data = dataset['test']
+del dataset
+del train_data
 
 # Init RL
 actor_critic = ActorCritic(model)
@@ -43,8 +51,7 @@ for param in actor_critic.model.parameters():
 
 optimizer = AdamW(actor_critic.parameters(), lr=learning_rate)
 ppo = PPO(actor_critic, optimizer, clip_ratio)
-env = TextEnv(train_data, model, tokenizer, device, k)
-
+env = TextEnv(train_token, train_label, model, k, device)
 
 last_hidden_lock = True
 
