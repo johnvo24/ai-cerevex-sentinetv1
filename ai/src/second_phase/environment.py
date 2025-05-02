@@ -21,7 +21,7 @@ reward_predict_at_the_end = config['rl_training']['reward_predict_at_the_end']
 penalty_predict = config['rl_training']['penalty_predict']
 penalty_predict_at_the_end = config['rl_training']['penalty_predict_at_the_end']
 penalty_read = config['rl_training']['penalty_read']
-batch_size = config['rl_training']['batch_size']
+num_data = config['rl_training']['num_data']
 
 def split_dataset(dataset, samples_per_class=1250):
     # Group samples by label
@@ -47,12 +47,13 @@ def split_dataset(dataset, samples_per_class=1250):
     return balanced_subset
 
 class TextEnv(gym.Env):
-    def __init__(self, dataset, model, tokenizer, device):
-        self.dataset = split_dataset(dataset, samples_per_class=batch_size)
+    def __init__(self, dataset, model, tokenizer, device, k):
+        self.dataset = split_dataset(dataset, samples_per_class=num_data)
         self.model = model
         self.tokenizer = tokenizer
         self.current_dataset_index = 0
         self.current_sentence_index = 0
+        self.k = k
         self.word_chunk = [self.dataset['text'][self.current_dataset_index].split(' ')[self.current_sentence_index]]
         self.softmax = nn.Softmax(dim=1)
         self.device = device
@@ -62,16 +63,17 @@ class TextEnv(gym.Env):
     def reset(self):
         self.current_dataset_index = 0
         self.current_sentence_index = 0
-        self.word_chunk = [self.dataset['text'][self.current_dataset_index].split(' ')[self.current_sentence_index]]
+        self.word_chunk = [self.dataset['text'][self.current_dataset_index].split(' ')[0]]
         return self._get_state(self.word_chunk)
 
     def next_sentence(self):
         self.current_dataset_index += 1
         self.current_sentence_index = 0
+
         if self.current_dataset_index == len(self.dataset):
             return None
 
-        self.word_chunk = [self.dataset['text'][self.current_dataset_index].split(' ')[self.current_sentence_index]]
+        self.word_chunk = [self.dataset['text'][self.current_dataset_index].split(' ')[0]]
         return self._get_state(self.word_chunk)
 
     def _get_state(self, word_chunk):
@@ -80,15 +82,17 @@ class TextEnv(gym.Env):
         return encoded['input_ids'].to(self.device)
 
     def step(self, action):
+        print('Start')
         max_len = len(self.dataset['text'][self.current_dataset_index].split(' '))
         true_action = self.dataset['label'][self.current_dataset_index]
+        print('Stop')
 
         # Continue Reading
         if action == action_read:
             if len(self.word_chunk) < max_len: # Continue read
                 reward = penalty_read
-                self.current_sentence_index += 1
-                self.word_chunk.append(self.dataset['text'][self.current_dataset_index].split(' ')[self.current_sentence_index])
+                self.current_sentence_index = min(self.current_sentence_index + self.k, max_len - 1)
+                self.word_chunk = self.dataset['text'][self.current_dataset_index].split(' ')[:self.current_sentence_index + 1]
                 done = False
 
             else: # Force predict, reach the end

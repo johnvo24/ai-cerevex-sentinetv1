@@ -17,9 +17,10 @@ def load_config(config_path='config.yaml'):
 config = load_config()
 episode = config['rl_training']['episode']
 learning_rate = config['rl_training']['learning_rate']
-batch_size = config['rl_training']['batch_size']
+num_data = config['rl_training']['num_data']
 clip_ratio = config['rl_training']['clip_ratio']
 SFT_model_path = config['rl_training']['SFT_model_path']
+k = config['rl_training']['k']
     
 # Load dataset
 print('Loading dataset...')
@@ -36,18 +37,38 @@ tokenizer = BertTokenizer.from_pretrained(SFT_model_path)
 # Init RL
 actor_critic = ActorCritic(model)
 actor_critic.to(device)
+
+for param in actor_critic.model.parameters():
+    param.requires_grad = False
+
 optimizer = AdamW(actor_critic.parameters(), lr=learning_rate)
 ppo = PPO(actor_critic, optimizer, clip_ratio)
-env = TextEnv(train_data, model, tokenizer, device)
+env = TextEnv(train_data, model, tokenizer, device, k)
+
+
+last_hidden_lock = True
 
 # Start training
 print('Start training...')
-for ep in tqdm(range(episode), desc='Episode'):
-    state = env.reset()
+process = tqdm(range(episode))
+for ep in process:
+    if ep >= episode // 2 and last_hidden_lock:
+        last_hidden_lock = False
+        for name, param in actor_critic.model.named_parameters():
+            if 'encoder.layer.11' in name or 'pooler' in name:
+                param.requires_grad = True
+        print('Last hidden layer unlocked')
 
-    for sentence in range(batch_size*4):
+    state = env.reset()
+    avg_reward = 0
+    avg_loss = 0
+    count = 0
+
+    for sentence in range(num_data*4):
         done = False
         total_reward = 0
+        total_critic_loss = 0
+        loss_count = 0
 
         while not done:
             state = state.to(device)
@@ -57,11 +78,19 @@ for ep in tqdm(range(episode), desc='Episode'):
             next_state, reward, done = env.step(action)
             total_reward += reward
 
-            ppo.update(state, action, reward, next_state)
+            loss = ppo.update(state, action, reward, next_state)
+            total_critic_loss += loss
+            loss_count += 1
             state = next_state
 
+        count += 1
+        avg_reward += total_reward
+        avg_loss += total_critic_loss / loss_count
         state = env.next_sentence()
-        tqdm.write(f"Episode {ep+1}/{episode}, Batch {sentence+1}/{batch_size*4}, Total Reward: {total_reward}")  # Show episode result
+        process.set_description(f"Episode {ep+1}/{episode}, Data no.{sentence+1}/{num_data*4}, Avg Reward: {avg_reward/count:.2f}")
+
+        if (sentence+1) % 100 == 0:
+            tqdm.write(f'Episode {ep+1}/{episode}, Avg Reward: {avg_reward/count:.2f}, Avg Critic Loss: {avg_loss/loss_count:.2f}')
 
 # Save policy model
 print('Saving policy model...')

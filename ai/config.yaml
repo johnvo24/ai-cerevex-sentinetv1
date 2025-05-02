@@ -21,9 +21,10 @@ training:
 rl_training:
   episode: 5000
   learning_rate: 0.000005
-  batch_size: 5000
+  num_data: 25000
   clip_ratio: 0.2
   SFT_model_path: "model/checkpoint-3"
+  k: 5
   action_read: 0
   action_predict: 1
   penalty_read: -0.01

@@ -36,11 +36,15 @@ class PPO:
         obj = adv*ratio
         obj_clipped = adv*torch.clamp(ratio, 1-self.clip_param, 1+self.clip_param)
         loss = -torch.min(obj, obj_clipped).mean()
+        critic_loss = (adv**2).mean()
 
-        return loss
+        return loss, critic_loss
 
     def update(self, states, actions, rewards, next_states):
         self.optimizer.zero_grad()
-        loss = self.compute_loss(states, actions, rewards, next_states)
+        loss, critic_loss = self.compute_loss(states, actions, rewards, next_states)
         loss.backward()
         self.optimizer.step()
+
+        # print('Updated!')
+        return critic_loss
