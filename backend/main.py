@@ -14,9 +14,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# app.include_router(feedback.router, prefix="/api/v1", tags=["Feedback"])
+app.include_router(feedback.router, prefix="/api/v1", tags=["Feedback"])
 app.include_router(users.router, prefix="/api/v1", tags=["Users"])
-# app.include_router(articles.router, prefix="/api/v1", tags=["Articles"])
+app.include_router(articles.router, prefix="/api/v1", tags=["Articles"])
 # app.include_router(tag.router, prefix="/api/v1", tags=["Tags"])
 # app.include_router(articletag.router, prefix="/api/v1", tags=["ArticleTags"])
 
