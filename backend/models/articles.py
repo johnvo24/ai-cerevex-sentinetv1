@@ -4,9 +4,9 @@ from models.database import get_db_conn
 
 async def create_article(conn: AsyncConnection, article: ArticleCreate) -> ArticleResponse:
     query = """
-        INSERT INTO Article (user_id, model_id, title, content, sentiment_label)
-        VALUES (%s, %s, %s, %s, %s)
-        RETURNING id, user_id, model_id, title, content, sentiment_label, created_at
+        INSERT INTO Article (user_id, model_id, title, content)
+        VALUES (%s, %s, %s, %s)
+        RETURNING id, user_id, model_id, title, content, created_at
     """
     async with conn.cursor() as cur:
         await cur.execute(query, (
@@ -14,7 +14,6 @@ async def create_article(conn: AsyncConnection, article: ArticleCreate) -> Artic
             article.model_id, 
             article.title, 
             article.content, 
-            article.sentiment_label
         ))
         row = await cur.fetchone()
         if row:
@@ -24,14 +23,13 @@ async def create_article(conn: AsyncConnection, article: ArticleCreate) -> Artic
                 model_id=row[2],
                 title=row[3],
                 content=row[4],
-                sentiment_label=row[5],
-                created_at=row[6]
+                created_at=row[5]
             )
         return None
 
 async def get_article(conn: AsyncConnection, article_id: int) -> ArticleResponse:
     query = """
-        SELECT id, user_id, model_id, title, content, sentiment_label, created_at
+        SELECT id, user_id, model_id, title, content, created_at
         FROM Article
         WHERE id = %s
     """
@@ -45,14 +43,13 @@ async def get_article(conn: AsyncConnection, article_id: int) -> ArticleResponse
                 model_id=row[2],
                 title=row[3],
                 content=row[4],
-                sentiment_label=row[5],
-                created_at=row[6]
+                created_at=row[5]
             )
         return None
 
 async def get_all_articles(conn: AsyncConnection) -> list[ArticleResponse]:
     query = """
-        SELECT id, user_id, model_id, title, content, sentiment_label, created_at
+        SELECT id, user_id, model_id, title, content, created_at
         FROM Article
     """
     async with conn.cursor() as cur:
@@ -64,24 +61,22 @@ async def get_all_articles(conn: AsyncConnection) -> list[ArticleResponse]:
             model_id=row[2],
             title=row[3],
             content=row[4],
-            sentiment_label=row[5],
-            created_at=row[6]
+            created_at=row[5]
         ) for row in rows]
         return articles
 
 async def update_article(conn: AsyncConnection, article_id: int, article: ArticleUpdate) -> ArticleResponse:
     query = """
         UPDATE Article
-        SET model_id = %s, title = %s, content = %s, sentiment_label = %s
+        SET model_id = %s, title = %s, content = %s
         WHERE id = %s
-        RETURNING id, user_id, model_id, title, content, sentiment_label, created_at
+        RETURNING id, user_id, model_id, title, content, created_at
     """
     async with conn.cursor() as cur:
         await cur.execute(query, (
             article.model_id, 
             article.title, 
             article.content, 
-            article.sentiment_label, 
             article_id
         ))
         row = await cur.fetchone()
@@ -92,8 +87,7 @@ async def update_article(conn: AsyncConnection, article_id: int, article: Articl
                 model_id=row[2],
                 title=row[3],
                 content=row[4],
-                sentiment_label=row[5],
-                created_at=row[6]
+                created_at=row[5]
             )
         return None
 
