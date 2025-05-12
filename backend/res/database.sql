@@ -1,6 +1,6 @@
 DROP TABLE IF EXISTS ArticleTag;
 DROP TABLE IF EXISTS Tag;
-DROP TABLE IF EXISTS Feedback;
+DROP TABLE IF EXISTS Comment;
 DROP TABLE IF EXISTS Article;
 DROP TABLE IF EXISTS Users;
 
@@ -20,18 +20,16 @@ CREATE TABLE Article (
     model_id INT,
     title VARCHAR(255),
     content TEXT,
-    sentiment_label VARCHAR(50),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES Users(id)
 );
 
-CREATE TABLE Feedback (
+CREATE TABLE Comment (
     id SERIAL PRIMARY KEY,
     article_id INT,
     user_id INT,
-    feedback_txt TEXT,
-    is_correct BOOLEAN,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    content TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (article_id) REFERENCES Article(id),
     FOREIGN KEY (user_id) REFERENCES Users(id)
 );
@@ -43,7 +41,7 @@ CREATE TABLE Tag (
 
 CREATE TABLE ArticleTag (
     article_id INT,
-    tag_id INT
+    tag_id INT,
     PRIMARY KEY (article_id, tag_id),
     FOREIGN KEY (article_id) REFERENCES Article(id),
     FOREIGN KEY (tag_id) REFERENCES Tag(id)
