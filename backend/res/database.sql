@@ -10,7 +10,6 @@ CREATE TABLE Users (
     password VARCHAR(255) NOT NULL,
     name VARCHAR(255),
     email VARCHAR(255),
-    role BOOLEAN,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -29,6 +28,7 @@ CREATE TABLE Comment (
     article_id INT,
     user_id INT,
     content TEXT,
+    sentiment VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (article_id) REFERENCES Article(id),
     FOREIGN KEY (user_id) REFERENCES Users(id)

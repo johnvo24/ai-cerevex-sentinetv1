@@ -11,8 +11,8 @@ async def create_user(user: UserCreate, conn: AsyncConnection = Depends(get_db_c
     return await user_model.create_user(conn, user)
 
 @router.get("/get/{user_id}", response_model=UserResponse)
-async def get_user(user_id: int, conn: AsyncConnection = Depends(get_db_conn)):
-    result = await user_model.get_user(conn, user_id)
+async def get_user_by_id(user_id: int, conn: AsyncConnection = Depends(get_db_conn)):
+    result = await user_model.get_user_by_id(conn, user_id)
     if not result:
         raise HTTPException(status_code=404, detail="User not found")
     return result

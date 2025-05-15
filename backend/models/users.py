@@ -4,37 +4,37 @@ from models.helper import hash_pw
 
 async def create_user(conn: AsyncConnection, user: UserCreate):
     query = """
-        INSERT INTO Users (username, password, name, email, role)
-        VALUES (%s, %s, %s, %s, %s)
-        RETURNING id, username, name, email, role, created_at
+        INSERT INTO Users (username, password, name, email)
+        VALUES (%s, %s, %s, %s)
+        RETURNING id, username, name, email, created_at
     """
     async with conn.cursor() as cur:
         hashed_pw = hash_pw(user.password)
-        await cur.execute(query, (user.username, hashed_pw, user.name, user.email, user.role))
+        await cur.execute(query, (user.username, hashed_pw, user.name, user.email))
         row = await cur.fetchone()
         return UserResponse(
-            id=row[0], username=row[1], name=row[2], email=row[3], role=row[4], created_at=row[5]
+            id=row[0], username=row[1], name=row[2], email=row[3], created_at=row[4]
         )
 
-async def get_user(conn: AsyncConnection, user_id: int):
-    query = "SELECT id, username, name, email, role, created_at FROM Users WHERE id = %s"
+async def get_user_by_id(conn: AsyncConnection, user_id: int):
+    query = "SELECT id, username, name, email, created_at FROM Users WHERE id = %s"
     async with conn.cursor() as cur:
         await cur.execute(query, (user_id,))
         row = await cur.fetchone()
         if row:
             return UserResponse(
                 id=row[0], username=row[1], name=row[2],
-                email=row[3], role=row[4], created_at=row[5]
+                email=row[3], created_at=row[4]
             )
 
 async def get_all_users(conn: AsyncConnection):
-    query = "SELECT id, username, name, email, role, created_at FROM Users"
+    query = "SELECT id, username, name, email, created_at FROM Users"
     async with conn.cursor() as cur:
         await cur.execute(query)
         rows = await cur.fetchall()
         return [UserResponse(
             id=row[0], username=row[1], name=row[2],
-            email=row[3], role=row[4], created_at=row[5]
+            email=row[3], created_at=row[4]
         ) for row in rows]
 
 async def update_user(conn: AsyncConnection, user_id: int, user: UserUpdate):
@@ -50,9 +50,6 @@ async def update_user(conn: AsyncConnection, user_id: int, user: UserUpdate):
     if user.password:
         fields.append("password = %s")
         values.append(hash_pw(user.password))
-    if user.role is not None:
-        fields.append("role = %s")
-        values.append(user.role)
 
     if not fields:
         return None

@@ -3,12 +3,12 @@ from schemas.comment import CommentCreate, CommentUpdate, CommentResponse
 
 async def create_comment(conn: AsyncConnection, comment: CommentCreate):
     query = """
-        INSERT INTO Comment (article_id, user_id, content)
-        VALUES (%s, %s, %s)
-        RETURNING id, article_id, user_id, content, created_at
+        INSERT INTO Comment (article_id, user_id, content, sentiment)
+        VALUES (%s, %s, %s, %s)
+        RETURNING id, article_id, user_id, content, sentiment, created_at
     """
     async with conn.cursor() as cur:
-        await cur.execute(query, (comment.article_id, comment.user_id, comment.content))
+        await cur.execute(query, (comment.article_id, comment.user_id, comment.content, comment.sentiment))
         row = await cur.fetchone()
         if row:
             return CommentResponse(
@@ -16,11 +16,12 @@ async def create_comment(conn: AsyncConnection, comment: CommentCreate):
                 article_id=row[1],
                 user_id=row[2],
                 content=row[3],
-                created_at=row[4]
+                sentiment=row[4],
+                created_at=row[5]
             )
 
 async def get_all_comments(conn: AsyncConnection):
-    query = "SELECT id, article_id, user_id, content, created_at FROM Comment"
+    query = "SELECT * FROM Comment"
     async with conn.cursor() as cur:
         await cur.execute(query)
         rows = await cur.fetchall()
@@ -29,11 +30,12 @@ async def get_all_comments(conn: AsyncConnection):
             article_id=row[1],
             user_id=row[2],
             content=row[3],
-            created_at=row[4]
+            sentiment=row[4],
+            created_at=row[5]
         ) for row in rows]
 
 async def get_comment(conn: AsyncConnection, comment_id: int):
-    query = "SELECT id, article_id, user_id, content, created_at FROM Comment WHERE id = %s"
+    query = "SELECT * FROM Comment WHERE id = %s"
     async with conn.cursor() as cur:
         await cur.execute(query, (comment_id,))
         row = await cur.fetchone()
@@ -43,7 +45,8 @@ async def get_comment(conn: AsyncConnection, comment_id: int):
                 article_id=row[1],
                 user_id=row[2],
                 content=row[3],
-                created_at=row[4]
+                sentiment=row[4],
+                created_at=row[5]
             )
 
 async def update_comment(conn: AsyncConnection, comment_id: int, comment: CommentUpdate):
@@ -51,7 +54,7 @@ async def update_comment(conn: AsyncConnection, comment_id: int, comment: Commen
         UPDATE Comment
         SET content = %s
         WHERE id = %s
-        RETURNING id, article_id, user_id, content, created_at
+        RETURNING id, article_id, user_id, content, sentiment, created_at
     """
     async with conn.cursor() as cur:
         await cur.execute(query, (comment.content, comment_id))
@@ -62,7 +65,8 @@ async def update_comment(conn: AsyncConnection, comment_id: int, comment: Commen
                 article_id=row[1],
                 user_id=row[2],
                 content=row[3],
-                created_at=row[4]
+                sentiment=row[4],
+                created_at=row[5]
             )
         return None
 
