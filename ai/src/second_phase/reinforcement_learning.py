@@ -32,6 +32,7 @@ class PPO:
 
         adv = rewards - state_values.detach()
         ratio = action_probs.gather(1, actions) / old_action_probs.gather(1, actions)
+        print(ratio)
 
         obj = adv*ratio
         obj_clipped = adv*torch.clamp(ratio, 1-self.clip_param, 1+self.clip_param)

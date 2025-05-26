@@ -23,7 +23,7 @@ rl_training:
   learning_rate: 0.000005
   num_data: 1250
   clip_ratio: 0.2
-  SFT_model_path: "model/checkpoint-3"
+  SFT_model_path: "model/checkpoint-22500"
   k: 5
   action_read: 0
   action_predict: 1

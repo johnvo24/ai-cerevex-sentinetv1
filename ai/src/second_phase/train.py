@@ -42,12 +42,13 @@ train_label = train_label.to(device)
 del dataset
 del train_data
 
+
 # Init RL
 actor_critic = ActorCritic(model)
 actor_critic.to(device)
 
-for param in actor_critic.model.parameters():
-    param.requires_grad = False
+# for param in actor_critic.model.parameters():
+#     param.requires_grad = False
 
 optimizer = AdamW(actor_critic.parameters(), lr=learning_rate)
 ppo = PPO(actor_critic, optimizer, clip_ratio)
@@ -59,12 +60,12 @@ last_hidden_lock = True
 print('Start training...')
 process = tqdm(range(episode))
 for ep in process:
-    if ep >= episode // 2 and last_hidden_lock:
-        last_hidden_lock = False
-        for name, param in actor_critic.model.named_parameters():
-            if 'encoder.layer.11' in name or 'pooler' in name:
-                param.requires_grad = True
-        print('Last hidden layer unlocked')
+    # if ep >= episode // 2 and last_hidden_lock:
+    #     last_hidden_lock = False
+    #     for name, param in actor_critic.model.named_parameters():
+    #         if 'encoder.layer.11' in name or 'pooler' in name:
+    #             param.requires_grad = True
+    #     print('Last hidden layer unlocked')
 
     state = env.reset()
     avg_reward = 0
@@ -79,7 +80,7 @@ for ep in process:
 
         while not done:
             state = state.to(device)
-            action_probs, _ = actor_critic(state) 
+            action_probs, _ = actor_critic(state)
             action = torch.multinomial(action_probs, 1)
 
             next_state, reward, done = env.step(action)
