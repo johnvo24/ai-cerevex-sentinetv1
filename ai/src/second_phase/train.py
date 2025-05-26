@@ -46,8 +46,8 @@ del train_data
 actor_critic = ActorCritic(model)
 actor_critic.to(device)
 
-for param in actor_critic.model.parameters():
-    param.requires_grad = False
+# for param in actor_critic.model.parameters():
+#     param.requires_grad = False
 
 optimizer = AdamW(actor_critic.parameters(), lr=learning_rate)
 ppo = PPO(actor_critic, optimizer, clip_ratio)
