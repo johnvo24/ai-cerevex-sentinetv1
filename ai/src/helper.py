@@ -4,5 +4,5 @@ gdrive = GDrive()
 gdrive.download_file(
   file_name='checkpoint-22500.zip',
   folder_path='/models/cerevex-sentinetv1',
-  destination_path='/model'
+  destination_path='/model/checkpoint-22500.zip'
 )
