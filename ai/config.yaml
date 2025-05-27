@@ -24,7 +24,7 @@ rl_training:
   num_data: 1250
   clip_ratio: 0.2
   SFT_model_path: "model/checkpoint-22500"
-  k: 5
+  k: 1
   action_read: 0
   action_predict: 1
   penalty_read: -0.01
