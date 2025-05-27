@@ -57,14 +57,14 @@ class TextEnv(gym.Env):
         self.device = device
 
     def reset(self):
-        self.current_dataset_index = 0
-        self.current_sentence_index = 0
+        self.current_tokens_index = 0
+        self.current_token_index = 0
         self.token_chunk = [self.tokens[self.current_tokens_index][self.current_token_index]]
         return self._get_state(self.token_chunk)
 
     def next_sentence(self):
-        self.current_dataset_index += 1
-        self.current_sentence_index = 0
+        self.current_tokens_index += 1
+        self.current_token_index = 0
 
         if self.current_tokens_index == len(self.tokens):
             return None
