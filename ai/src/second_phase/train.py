@@ -53,6 +53,9 @@ env = TextEnv(train_token, train_label, model, k, device)
 
 # Start training
 print('Start training...')
+best_actorcritic = actor_critic
+best_avg_reward = -999.0
+best_epoch = 0
 process = tqdm(range(episode))
 for ep in process:
     state = env.reset()
@@ -78,7 +81,12 @@ for ep in process:
         avg_reward += total_reward
         state = env.next_sentence()
         process.set_description(f"Episode {ep+1}/{episode}, Data no.{sentence+1}/{num_data*4}, Avg Reward: {avg_reward/count:.2f}")
+    
+    if avg_reward > best_avg_reward:
+        best_actorcritic = actor_critic
+        best_avg_reward = avg_reward
+        best_epoch = ep
 
 # Save policy model
 print('Saving policy model...')
-torch.save(actor_critic.state_dict(), 'model/actor_critic.pt')
+torch.save(best_actorcritic.state_dict(), f'model/best_actor_critic_{best_epoch}.pt')
