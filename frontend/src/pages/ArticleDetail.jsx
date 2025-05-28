@@ -73,7 +73,7 @@ export const ArticleDetail = () => {
             className="mt-4 md:mt-0 bg-black text-white text-sm px-6 py-2 rounded-full hover:opacity-75"
             onClick={handleToggleFeedback}
           >
-            Feedback
+            Comment
           </button>
         </div>
 
