@@ -27,24 +27,24 @@ class TextEnv(gym.Env):
 
     def reset(self):
         self.current_tokens_index = 0
-        self.current_token_index = 0
-        self.token_chunk = [self.tokens[self.current_tokens_index][self.current_token_index]]
-        return self._get_state(self.token_chunk)
+        self.current_token_index = self.k - 1
+        self.token_chunk = self.tokens[self.current_tokens_index][: self.current_token_index + 1]
+        return self._get_state()
 
     def next_sentence(self):
         self.current_tokens_index += 1
-        self.current_token_index = 0
+        self.current_token_index = self.k - 1
 
         if self.current_tokens_index == len(self.tokens): return None
 
-        self.token_chunk = [self.tokens[self.current_tokens_index][self.current_token_index]]
-        return self._get_state(self.token_chunk)
+        self.token_chunk = self.tokens[self.current_tokens_index][: self.current_token_index + 1]
+        return self._get_state()
 
-    def _get_state(self, chunk):
-        return chunk.unsqueeze(0).to(self.device) if isinstance(chunk, torch.Tensor) else torch.tensor(chunk, dtype=torch.long).unsqueeze(0).to(self.device)
+    def _get_state(self):
+        return self.token_chunk.unsqueeze(0).to(self.device) if isinstance(self.token_chunk, torch.Tensor) else torch.tensor(self.token_chunk, dtype=torch.long).unsqueeze(0).to(self.device)
 
     def _predict_label(self):
-        logits = self.model(self._get_state(self.token_chunk)).logits
+        logits = self.model(self._get_state()).logits
         return torch.argmax(self.softmax(logits), dim=-1)
 
     def step(self, action, pad_token_id):
@@ -57,7 +57,7 @@ class TextEnv(gym.Env):
         is_next_k_not_full_token_id = bool((chunk[self.current_token_index+1:next_token_index+1] != pad_token_id).any().item())
         if action == action_read:
             if len(self.token_chunk) < max_len and is_next_k_not_full_token_id == True: # Continue read
-                self.current_token_index = min(self.current_token_index + self.k, max_len - 1)
+                self.current_token_index = next_token_index
                 self.token_chunk = chunk[:self.current_token_index + 1]
                 reward, done = penalty_read, False
             else: # Force predict, reach the end
@@ -74,7 +74,7 @@ class TextEnv(gym.Env):
                 reward = reward_predict_at_the_end if pred_label == true_label else penalty_predict_at_the_end
             done = True
 
-        next_state = self._get_state(self.token_chunk)
+        next_state = self._get_state()
         return next_state, reward, done
     
 

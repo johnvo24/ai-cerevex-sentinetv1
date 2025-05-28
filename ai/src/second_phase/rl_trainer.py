@@ -76,7 +76,7 @@ class RLTrainer:
 
         for epoch in process:
             states, actions, rewards, old_log_probs = [], [], [], []
-            states_batch, actions_batch, rewards_batch, old_log_probs_batch = [], [], [], []
+            states_batch_input_ids, states_batch_attention_mask, actions_batch, rewards_batch, old_log_probs_batch = [], [], [], [], []
             state = self.env.reset()
             total_reward = 0.0
             count = 0
@@ -90,8 +90,14 @@ class RLTrainer:
 
                 while not done:
                     state.to(self.device)
+                    state_input_ids = self._pad_fixed_length([state], self.max_chunk_length, self.tokenizer.pad_token_id).to(self.device)
+                    state_attention_mask = (state_input_ids != 0).long().to(self.device)
+                    state_inputs = {
+                        'input_ids': state_input_ids,
+                        'attention_mask': state_attention_mask
+                    }
                     with torch.no_grad():
-                        action_probs, _ = self.actor_critic(state)
+                        action_probs, _ = self.actor_critic(state_inputs)
                     action = torch.argmax(action_probs, dim=1)
 
                     log_prob = torch.log(action_probs.gather(1, action.unsqueeze(1)).squeeze(1))
@@ -99,7 +105,8 @@ class RLTrainer:
                     # print(reward, end=f' [{step}]-> ')
                     eps_reward += reward
 
-                    states_batch.append(state)
+                    states_batch_input_ids.append(state_input_ids)
+                    states_batch_attention_mask.append(state_attention_mask)
                     actions_batch.append(action)
                     rewards_batch.append(reward)
                     old_log_probs_batch.append(log_prob)
@@ -113,30 +120,28 @@ class RLTrainer:
                 process.set_description(f"Epoch {epoch+1}/{self.num_epoch}, [Rollout] Episode {episode+1}/{self.batch_size}, Episode Avg Reward: {total_reward/count:.2f}")
                 # Pad States batch
                 if count % self.mini_batch_size == 0 or count == self.batch_size:
-                    padded_states_batch = self._pad_fixed_length(states_batch, self.max_chunk_length, self.tokenizer.pad_token_id)
-                    states.append(padded_states_batch)
-                    print(len(actions_batch) == len(states_batch))
+                    # Append to rollout buffer
+                    states.append({
+                        'input_ids': torch.cat(states_batch_input_ids, dim=0),
+                        'attention_mask': torch.cat(states_batch_attention_mask, dim=0)
+                    })
                     actions.append(torch.tensor(actions_batch))
                     rewards.append(rewards_batch)
                     old_log_probs.append(torch.tensor(old_log_probs_batch))
                     # Reset batch buffer
-                    states_batch, actions_batch, rewards_batch, old_log_probs_batch = [], [], [], []
+                    states_batch_input_ids, states_batch_attention_mask, actions_batch, rewards_batch, old_log_probs_batch = [], [], [], [], []
                 # Next episode
                 state = self.env.next_sentence()
                 if state is None: break
-
-            states = torch.cat(states).to(self.device)
-            actions = torch.cat(actions).to(self.device)
-            old_log_probs = torch.cat(old_log_probs).to(self.device)
 
             # ===== UPDATE POLICY PHASE =====
             for i in range(len(states)):
                 # print(states[i])
                 self.ppo.update(
                     states=states[i],
-                    actions=actions[i],
+                    actions=actions[i].to(self.device),
                     rewards=torch.tensor(rewards[i], dtype=torch.float32, device=self.device),
-                    old_log_probs=old_log_probs[i]
+                    old_log_probs=old_log_probs[i].to(self.device)
                 )
 
             # Save model at each epoch (optional: can use early stopping/best reward logic here)

@@ -14,14 +14,16 @@ class ActorCritic(nn.Module):
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
-        output = self.model(x, output_hidden_states=True)
+        with torch.no_grad():
+            output = self.model(**x, output_hidden_states=True)
         hidden_state = output.hidden_states[-1]
         cls_token = hidden_state[:, 0, :]
 
         action_probs = self.softmax(self.actor(cls_token))
-        state_value = self.critic(cls_token)
+        state_values = self.critic(cls_token)
+        # print(action_probs, state_values)
 
-        return action_probs, state_value
+        return action_probs, state_values
 
     def state_dict(self, *args, **kwargs):
         # Lấy toàn bộ state_dict bình thường
@@ -49,6 +51,7 @@ class PPO:
         obj = adv*ratio
         obj_clipped = adv*torch.clamp(ratio, 1-self.clip_epsilon, 1+self.clip_epsilon)
         policy_loss = -torch.min(obj, obj_clipped).mean()
+        print(policy_loss)
 
         return policy_loss
 
