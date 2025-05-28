@@ -2,3 +2,4 @@ venv/
 model/
 *pycache*
 *service_account_key*
+*test*
