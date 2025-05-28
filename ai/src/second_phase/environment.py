@@ -14,7 +14,6 @@ reward_predict_at_the_end = config['rl_training']['reward_predict_at_the_end']
 penalty_predict = config['rl_training']['penalty_predict']
 penalty_predict_at_the_end = config['rl_training']['penalty_predict_at_the_end']
 penalty_read = config['rl_training']['penalty_read']
-num_data = config['rl_training']['num_data']
 
 class TextEnv(gym.Env):
     def __init__(self, tokens, labels, model, k, device):

@@ -6,6 +6,9 @@ class ActorCritic(nn.Module):
     def __init__(self, model=None):
         super(ActorCritic, self).__init__()
         self.model = model
+        for param in self.model.parameters():
+            param.requires_grad = False
+        self.model.eval()
         self.actor = nn.Linear(768, 2)
         self.critic = nn.Linear(768, 1)
         self.softmax = nn.Softmax(dim=1)
@@ -19,6 +22,13 @@ class ActorCritic(nn.Module):
         state_value = self.critic(cls_token)
 
         return action_probs, state_value
+
+    def state_dict(self, *args, **kwargs):
+        # Lấy toàn bộ state_dict bình thường
+        full_dict = super().state_dict(*args, **kwargs)
+        # Lọc bỏ key liên quan đến self.model
+        filtered_dict = {k: v for k, v in full_dict.items() if not k.startswith('model.')}
+        return filtered_dict
 
 class PPO:
     def __init__(self, actorcritic, optimizer, clip_epsilon=0.2):
@@ -45,6 +55,6 @@ class PPO:
     def update(self, states, actions, rewards, old_log_probs):
         self.optimizer.zero_grad()
         loss = self.compute_loss(states, actions, rewards, old_log_probs)
-        with torch.autograd.detect_anomaly():
-            loss.backward()
+        # with torch.autograd.detect_anomaly():
+        loss.backward()
         self.optimizer.step()

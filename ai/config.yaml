@@ -22,12 +22,14 @@ training:
   gpu_device: 0
 
 rl_training:
-  episode: 4 # Epoch
+  num_epoch: 4 # Epoch
   learning_rate: 0.00005
-  num_data: 512 # Batch size = num_data * 4 
+  batch_size: 512 # Batch size = num_data * 4
+  mini_batch_size: 64
+  max_chunk_length: 128 # Sentence length
   clip_ratio: 0.2
   SFT_model_path: "model/checkpoint-22500"
-  k: 1
+  k: 5
   action_read: 0
   action_predict: 1
   penalty_read: -0.01

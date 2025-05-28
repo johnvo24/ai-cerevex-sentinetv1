@@ -16,9 +16,12 @@ class RLTrainer:
     def __init__(self):
         # Load config
         self.config = configs.load_config()
-        self.num_epoch = self.config['rl_training']['episode']
+        self.num_classes = self.config['input']['num_classes']
+        self.num_epoch = self.config['rl_training']['num_epoch']
         self.learning_rate = self.config['rl_training']['learning_rate']
-        self.num_data = self.config['rl_training']['num_data']
+        self.batch_size = self.config['rl_training']['batch_size']
+        self.mini_batch_size = self.config['rl_training']['mini_batch_size']
+        self.max_chunk_length = self.config['rl_training']['max_chunk_length']
         self.clip_ratio = self.config['rl_training']['clip_ratio']
         self.SFT_model_path = self.config['rl_training']['SFT_model_path']
         self.k = self.config['rl_training']['k']
@@ -38,7 +41,7 @@ class RLTrainer:
         dataset = load_dataset(self.config['data']['ag_news'])
 
         print('Tokenizing dataset...')
-        train_data = split_dataset(dataset['train'], samples_per_class=self.num_data)
+        train_data = split_dataset(dataset['train'], samples_per_class=int(self.batch_size/self.num_classes))
         train_token = self.tokenizer(train_data['text'], padding=True, return_tensors=None)
         self.train_tokens = [torch.tensor(token).to(self.device) for token in train_token['input_ids']]
         self.train_labels = torch.tensor(train_data['label']).to(self.device)
@@ -53,28 +56,40 @@ class RLTrainer:
         self.ppo = PPO(self.actor_critic, self.optimizer, self.clip_ratio)
         self.env = TextEnv(self.train_tokens, self.train_labels, self.model, self.k, self.device)
 
+    def _pad_fixed_length(self, tensors, max_length, pad_token_id):
+        padded = []
+        for tensor in tensors:
+            tensor = tensor.view(-1)
+            length = tensor.size(0)
+            if length > max_length: 
+                padded_tensor = tensor[:max_length]
+            else:
+                pad_size = max_length - length
+                padding = torch.full((pad_size,), pad_token_id, dtype=tensor.dtype, device=tensor.device)
+                padded_tensor = torch.cat([tensor, padding], dim=0)
+            padded.append(padded_tensor)
+        return torch.stack(padded, dim=0)
+
     def train(self):
         print('Start training...')
-        batch_size = self.num_data * 4
-        minibatch_size = 256
         process = tqdm(range(self.num_epoch))
 
         for epoch in process:
             states, actions, rewards, old_log_probs = [], [], [], []
+            states_batch, actions_batch, rewards_batch, old_log_probs_batch = [], [], [], []
             state = self.env.reset()
             total_reward = 0.0
             count = 0
 
             # ===== ROLLOUT PHASE =====
-            for episode in range(batch_size):
-                states_batch, actions_batch, rewards_batch, old_log_probs_batch = [], [], [], []
+            for episode in range(self.batch_size):
                 done = False
                 eps_reward = 0
                 step = 0
                 # print("Episode reward: ", end='')
 
                 while not done:
-                    state = state.to(self.device)
+                    state.to(self.device)
                     with torch.no_grad():
                         action_probs, _ = self.actor_critic(state)
                     action = torch.argmax(action_probs, dim=1)
@@ -95,32 +110,33 @@ class RLTrainer:
                 # print(f"{eps_reward:.2f}")
                 count += 1
                 total_reward += eps_reward
-                process.set_description(f"Epoch {epoch+1}/{self.num_epoch}, [Rollout] Episode {episode+1}/{batch_size}, Episode Avg Reward: {total_reward/count:.2f}")
+                process.set_description(f"Epoch {epoch+1}/{self.num_epoch}, [Rollout] Episode {episode+1}/{self.batch_size}, Episode Avg Reward: {total_reward/count:.2f}")
                 # Pad States batch
-                if count % minibatch_size == 0 or count == batch_size:
-                    padded_states_batch = pad_sequence([s.squeeze(0) for s in states_batch], batch_first=True, padding_value=self.tokenizer.pad_token_id)
-                    # print(padded_states_batch.shape)
+                if count % self.mini_batch_size == 0 or count == self.batch_size:
+                    padded_states_batch = self._pad_fixed_length(states_batch, self.max_chunk_length, self.tokenizer.pad_token_id)
                     states.append(padded_states_batch)
+                    print(len(actions_batch) == len(states_batch))
                     actions.append(torch.tensor(actions_batch))
                     rewards.append(rewards_batch)
                     old_log_probs.append(torch.tensor(old_log_probs_batch))
+                    # Reset batch buffer
+                    states_batch, actions_batch, rewards_batch, old_log_probs_batch = [], [], [], []
                 # Next episode
                 state = self.env.next_sentence()
                 if state is None: break
 
             states = torch.cat(states).to(self.device)
             actions = torch.cat(actions).to(self.device)
-            rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
             old_log_probs = torch.cat(old_log_probs).to(self.device)
 
             # ===== UPDATE POLICY PHASE =====
-            for start in range(0, len(states), minibatch_size):
-                end = start + minibatch_size
+            for i in range(len(states)):
+                # print(states[i])
                 self.ppo.update(
-                    states[start:end],
-                    actions[start:end],
-                    rewards[start:end],
-                    old_log_probs[start:end]
+                    states=states[i],
+                    actions=actions[i],
+                    rewards=torch.tensor(rewards[i], dtype=torch.float32, device=self.device),
+                    old_log_probs=old_log_probs[i]
                 )
 
             # Save model at each epoch (optional: can use early stopping/best reward logic here)
