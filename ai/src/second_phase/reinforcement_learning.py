@@ -51,7 +51,6 @@ class PPO:
         obj = adv*ratio
         obj_clipped = adv*torch.clamp(ratio, 1-self.clip_epsilon, 1+self.clip_epsilon)
         policy_loss = -torch.min(obj, obj_clipped).mean()
-        print(policy_loss)
 
         return policy_loss
 
@@ -61,3 +60,4 @@ class PPO:
         # with torch.autograd.detect_anomaly():
         loss.backward()
         self.optimizer.step()
+        return loss

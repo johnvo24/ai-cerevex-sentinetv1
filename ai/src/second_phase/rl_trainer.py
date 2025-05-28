@@ -23,6 +23,7 @@ class RLTrainer:
         self.mini_batch_size = self.config['rl_training']['mini_batch_size']
         self.max_chunk_length = self.config['rl_training']['max_chunk_length']
         self.clip_ratio = self.config['rl_training']['clip_ratio']
+        self.discount_y = self.config['rl_training']['discount_y']
         self.SFT_model_path = self.config['rl_training']['SFT_model_path']
         self.k = self.config['rl_training']['k']
 
@@ -69,6 +70,14 @@ class RLTrainer:
                 padded_tensor = torch.cat([tensor, padding], dim=0)
             padded.append(padded_tensor)
         return torch.stack(padded, dim=0)
+    
+    def _comput_discounted_rewards(self, eps_rewards_list, discount_y):
+        discounted_rewards = []
+        reward = 0
+        for r in reversed(eps_rewards_list):
+            reward = r + discount_y * reward
+            discounted_rewards.insert(0, reward)  # prepend
+        return discounted_rewards
 
     def train(self):
         print('Start training...')
@@ -87,6 +96,7 @@ class RLTrainer:
                 eps_reward = 0
                 step = 0
                 # print("Episode reward: ", end='')
+                eps_rewards_list = []
 
                 while not done:
                     state.to(self.device)
@@ -98,22 +108,25 @@ class RLTrainer:
                     }
                     with torch.no_grad():
                         action_probs, _ = self.actor_critic(state_inputs)
-                    action = torch.argmax(action_probs, dim=1)
+                        dist = torch.distributions.Categorical(action_probs)
+                        action = dist.sample()
+                        log_prob = dist.log_prob(action)
 
-                    log_prob = torch.log(action_probs.gather(1, action.unsqueeze(1)).squeeze(1))
                     next_state, reward, done = self.env.step(action, self.tokenizer.pad_token_id)
                     # print(reward, end=f' [{step}]-> ')
+                    eps_rewards_list.append(reward)
                     eps_reward += reward
-
+                    # Append to minibatch buffer
                     states_batch_input_ids.append(state_input_ids)
                     states_batch_attention_mask.append(state_attention_mask)
                     actions_batch.append(action)
-                    rewards_batch.append(reward)
                     old_log_probs_batch.append(log_prob)
-
+                    # Next state
                     state = next_state
                     step += 1
 
+                eps_discounted_rewards = self._comput_discounted_rewards(eps_rewards_list, self.discount_y)
+                rewards_batch.extend(eps_discounted_rewards)
                 # print(f"{eps_reward:.2f}")
                 count += 1
                 total_reward += eps_reward
@@ -135,15 +148,20 @@ class RLTrainer:
                 if state is None: break
 
             # ===== UPDATE POLICY PHASE =====
+            print("Avg policy loss: ", end='')
+            total_policy_loss = 0
             for i in range(len(states)):
                 # print(states[i])
-                self.ppo.update(
+                policy_loss = self.ppo.update(
                     states=states[i],
                     actions=actions[i].to(self.device),
                     rewards=torch.tensor(rewards[i], dtype=torch.float32, device=self.device),
                     old_log_probs=old_log_probs[i].to(self.device)
                 )
-
+                policy_loss = policy_loss.item()
+                print(policy_loss, end=' -> ')
+                total_policy_loss += policy_loss
+            print(total_policy_loss/len(states))
             # Save model at each epoch (optional: can use early stopping/best reward logic here)
             self._save_model(epoch)
 
