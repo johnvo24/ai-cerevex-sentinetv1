@@ -1,3 +1,6 @@
+project:
+  use_gdrive: False
+
 data:
   ag_news: "wangrongsheng/ag_news"
 
@@ -19,9 +22,9 @@ training:
   gpu_device: 0
 
 rl_training:
-  episode: 5000
+  episode: 4 # Epoch
   learning_rate: 0.00005
-  num_data: 1250
+  num_data: 512 # Batch size = num_data * 4 
   clip_ratio: 0.2
   SFT_model_path: "model/checkpoint-22500"
   k: 1

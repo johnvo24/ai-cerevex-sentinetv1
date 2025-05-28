@@ -3,8 +3,8 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 from oauth2client.service_account import ServiceAccountCredentials
 import httplib2
-import io
 import os
+import io
 import torch
 from tqdm import tqdm
 
@@ -71,6 +71,22 @@ class GDrive():
     print(f"[INF-gdrive] {folder_path} path is ready")
     return parent_folder_id
   
+  def list_all(self):
+    file_list = []
+    page_token = None
+    while True:
+      response = self.service.files().list(
+        q = "trashed=false", # Only list non-deleted files
+        fields = "nextPageToken, files(id, name)",
+        pageToken = page_token
+      ).execute()
+      for file in response.get('files', []):
+         file_list.append({'id': file['id'], 'name': file['name']})
+      page_token = response.get('nextPageTonken', None)
+      if page_token is None:
+         break
+    return file_list
+  
   def get_file_id(self, file_name, folder_path):
     folder_id = self.check_folder_exists(folder_path[1:])
     if not folder_id: return None
@@ -81,6 +97,28 @@ class GDrive():
       print(f"[WAR] {file_name} doesn't exist in {folder_path} path")
       return None
     return files[0]['id']
+
+  def upload_file(self, file_name, file_path, folder_path=f"/temp"):
+    """Upload a file to Google Drive."""
+    try:
+      file_metadata = {'name': file_name}
+      folder_id = self.ensure_folder_exists(folder_path[1:])
+      file_metadata['parents'] = [folder_id]
+
+      media = MediaFileUpload(file_path)
+      file = self.service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+      print(f"[SUC-gdrive] File '{file_name}' uploaded with ID: {file.get('id')}")
+      return file.get('id')
+    except Exception as e:
+      return
+    
+  def delete_files(self, file_ids):
+    for file_id in file_ids:
+      try:
+        self.service.files().delete(fileId=file_id).execute()
+        print(f"[SUC-gdrive] File deleted successfully")
+      except Exception as e:
+        print(f"[ERR-gdrive] File deletion failed: {e}")
 
   def download_file_to_memory(self, file_id):
     """Download a file from Google Drive and load it into memory."""
@@ -100,10 +138,15 @@ class GDrive():
     file_data.seek(0)
     return file_data
   
-  def download_file(self, file_name, folder_path, destination_path):
+  def download_file(self, file_id, destination_path):
     """Download a file from Google Drive"""
-    file_id = self.get_file_id(file_name, folder_path)
     file_data = self.download_file_to_memory(file_id)
     with open(destination_path, 'wb') as f:
       f.write(file_data.getvalue())
     print(f"[SUC-gdrive] File was downloaded and saved at: {destination_path}")
+
+  def load_model_from_drive(self, file_name, model_dir):
+    file_id = self.get_file_id(file_name=file_name, folder_path=f"/models/{model_dir}")
+    file_data = self.download_file_to_memory(file_id)
+    checkpoint = torch.load(file_data)
+    return checkpoint

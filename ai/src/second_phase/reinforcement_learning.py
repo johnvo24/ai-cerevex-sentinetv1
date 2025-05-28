@@ -21,33 +21,30 @@ class ActorCritic(nn.Module):
         return action_probs, state_value
 
 class PPO:
-    def __init__(self, actorcritic, optimizer, clip_param=0.2):
+    def __init__(self, actorcritic, optimizer, clip_epsilon=0.2):
         self.actorcritic = actorcritic
         self.optimizer = optimizer
-        self.clip_param = clip_param
-        self.old_log_prob = None
+        self.clip_epsilon = clip_epsilon
 
-    def compute_loss(self, states, actions, rewards, next_states):
+    # Incomplete loss function
+    def compute_loss(self, states, actions, rewards, old_log_probs):
+        # Forward pass
         action_probs, state_values = self.actorcritic(states)
         dist = torch.distributions.Categorical(action_probs)
         new_log_probs = dist.log_prob(actions)
-
-        if self.old_log_prob is None:
-            self.old_log_prob = new_log_probs
             
         adv = rewards - state_values.detach()
-        ratio = torch.exp(new_log_probs - self.old_log_prob.detach())
-        self.old_log_prob = new_log_probs
+        ratio = torch.exp(new_log_probs - old_log_probs)
 
         obj = adv*ratio
-        obj_clipped = adv*torch.clamp(ratio, 1-self.clip_param, 1+self.clip_param)
-        loss = -torch.min(obj, obj_clipped).mean()
+        obj_clipped = adv*torch.clamp(ratio, 1-self.clip_epsilon, 1+self.clip_epsilon)
+        policy_loss = -torch.min(obj, obj_clipped).mean()
 
-        return loss
+        return policy_loss
 
-    def update(self, states, actions, rewards, next_states):
+    def update(self, states, actions, rewards, old_log_probs):
         self.optimizer.zero_grad()
-        loss = self.compute_loss(states, actions, rewards, next_states)
+        loss = self.compute_loss(states, actions, rewards, old_log_probs)
         with torch.autograd.detect_anomaly():
             loss.backward()
         self.optimizer.step()
