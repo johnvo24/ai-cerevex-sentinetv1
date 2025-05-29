@@ -7,12 +7,16 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY backend/requirements.txt .
+RUN python -m venv /opt/venv
 
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt
+RUN /opt/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel
+
+COPY backend/requirements.txt .
+RUN /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ .
+
+ENV PATH="/opt/venv/bin:$PATH"
 
 EXPOSE 8000
 
