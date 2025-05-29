@@ -4,7 +4,7 @@ from models.helper import hash_pw
 
 async def create_user(conn: AsyncConnection, user: UserCreate):
     query = """
-        INSERT INTO Users (username, password, name, email)
+        INSERT INTO users (username, password, name, email)
         VALUES (%s, %s, %s, %s)
         RETURNING id, username, name, email, created_at
     """
