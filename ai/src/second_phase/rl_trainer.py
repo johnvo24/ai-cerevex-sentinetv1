@@ -184,11 +184,12 @@ class RLTrainer:
                 print(policy_loss, end=' -> ')
                 total_policy_loss += policy_loss
             print(total_policy_loss/num_minibatches)
+            print(0.2*np.exp(-0.53*(epoch)))
             
-            if total_reward/count >= train_avg_reward - 0.02:
+            if total_reward/count >= train_avg_reward - 0.05:
                 eval_avg_reward = self._evaluate_on_eval_set()
-                if eval_avg_reward > best_eval_avg_reward - 0.2*np.exp(-0.53*(count-1)): # De tai epoch 0 (-0.2) con epoch 10(-0.001)
-                    best_eval_avg_reward = eval_avg_reward
+                if eval_avg_reward > best_eval_avg_reward - 0.2*np.exp(-0.53*(epoch)): # De tai epoch 0 (-0.2) con epoch 10(-0.001)
+                    if eval_avg_reward >= best_eval_avg_reward: best_eval_avg_reward = eval_avg_reward
                     print('> Saving policy model...')
                     helper.save_checkpoint(
                         model_dir='actor_critic',
@@ -232,13 +233,11 @@ class RLTrainer:
                     action = dist.probs.argmax(dim=-1)
                 
                 next_state, reward, done = eval_env.step(action, self.tokenizer.pad_token_id)
-                print(reward, end='->')
                 eps_rewards.append(reward)
                 state = next_state
                 step += 1
 
             count += 1
-            print(sum(eps_rewards))
             total_eval_reward += sum(eps_rewards)
             state = eval_env.next_sentence()
             if state is None: break
