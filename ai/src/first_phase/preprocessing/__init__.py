@@ -1,2 +1,2 @@
-from preprocessing.preprocessing import Preprocessing
-from preprocessing.dataset import AGNewsDataset
+from first_phase.preprocessing.preprocessing import Preprocessing
+from first_phase.preprocessing.dataset import AGNewsDataset
