@@ -8,9 +8,7 @@ class CerevexSentinet():
     trainer = RLTrainer()
     trainer.train(from_gdrive=True)
 
-  def predict(
-    sentence="He stormed to win in the group round and quarter-finals before being stopped in the last-four round by world number one Dick Jaspers of the Netherlands."
-  ):
+  def predict(sentence):
     predictor = Predictor()
     readed_sentence, pred_label, prediction_time = predictor.predict(sentence=sentence)
     print(f"Readed sentence: {readed_sentence}")
@@ -35,8 +33,8 @@ if __name__ == "__main__":
         sentence = (
             sys.argv[2]
             if len(sys.argv) > 2
-            else "'He stormed to win in the group round and quarter-finals before being stopped in the last-four round by world number one Dick Jaspers of the Netherlands.'"
+            else "Some aspects of the partnership, which the carriers announced Thursday, will begin as early as the fall, though the airlines didn’t provide exact timing. They also did not provide financial details of the deal."
         )
-        CerevexSentinet.predict(sentence=sentence*5)
+        CerevexSentinet.predict(sentence=sentence)
     else:
         print("Invalid mode. Use 'train' or 'predict'.")
