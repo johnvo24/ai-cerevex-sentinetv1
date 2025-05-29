@@ -96,6 +96,7 @@ class RLTrainer:
         self.actor_critic.train() # Set train mode
         print(f"Loaded best_checkpoint.tar from GDrive at epoch {start_epoch}")
 
+        train_avg_reward = float('-inf')
         best_eval_avg_reward = float('-inf')
         process = tqdm(range(start_epoch+1, self.num_epoch))
         for epoch in process:
@@ -178,19 +179,25 @@ class RLTrainer:
                 total_policy_loss += policy_loss
             print(total_policy_loss/len(states))
             
-            eval_avg_reward = self._evaluate_on_eval_set()
-            if eval_avg_reward >= best_eval_avg_reward:
-                print('> Saving policy model...')
-                helper.save_checkpoint(
-                    model_dir='actor_critic',
-                    epoch=epoch,
-                    model=self.actor_critic,
-                    optimizer=self.optimizer,
-                    is_the_best=True
-                )
-                if self.config['project']['use_gdrive']: helper.save_best_checkpoint_to_gdrive(model_dir='actor_critic')
+            if total_reward/count >= train_avg_reward - 0.02:
+                eval_avg_reward = self._evaluate_on_eval_set()
+                if eval_avg_reward >= best_eval_avg_reward:
+                    best_eval_avg_reward = eval_avg_reward
+                    print('> Saving policy model...')
+                    helper.save_checkpoint(
+                        model_dir='actor_critic',
+                        epoch=epoch,
+                        model=self.actor_critic,
+                        optimizer=self.optimizer,
+                        is_the_best=True
+                    )
+                    if self.config['project']['use_gdrive']: helper.save_best_checkpoint_to_gdrive(model_dir='actor_critic')
+                else:
+                    print('Model is not good to save. (eval_avg_reward)')
             else:
-                print('Model is not good to save.')
+                print('Model is not good to save. (train_avg_reward)')
+            train_avg_reward = total_reward/count
+
 
     def _evaluate_on_eval_set(self):
         print("Evaluating on eval set...")
