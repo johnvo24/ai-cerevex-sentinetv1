@@ -1,4 +1,16 @@
-L https://download.docker.com/linux/ubuntu/gpg | \
+# REQUIREMENTS
+- Docker
+- Docker compose
+
+# Only For Ubuntu/Debian 
+
+# Cài đặt các gói cần thiết
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg
+
+# Thêm GPG key
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
     sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
 # Thêm repository
@@ -21,10 +33,13 @@ newgrp docker
 
 # Check
 docker --version
-docker compose version
+docker-compose version
 
 # Build
-## Dừng toàn bộ container và xóa volume nếu cần làm sạch
+## Dừng toàn bộ container và xóa volume
 docker-compose down -v
 ## Build và chạy lại container
 docker-compose up --build
+
+# FastAPI Docs: 
+http://localhost:8000/docs
