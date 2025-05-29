@@ -87,14 +87,14 @@ class RLTrainer:
 
     def train(self, from_gdrive=False):
         print(f"{'='*10} TRAINING LOOP {'='*10}")
-        start_epoch = 0
+        start_epoch = -1
         if from_gdrive:
             best_checkpoint = GDrive().load_model_from_drive(file_name='best_checkpoint.tar', model_dir='actor_critic')
             self.actor_critic.load_state_dict(state_dict=best_checkpoint['model_state_dict'], strict=False)
             self.optimizer.load_state_dict(best_checkpoint['optimizer_state_dict'])
             start_epoch = best_checkpoint['epoch']
+            print(f"Loaded best_checkpoint.tar from GDrive at epoch {start_epoch}")
         self.actor_critic.train() # Set train mode
-        print(f"Loaded best_checkpoint.tar from GDrive at epoch {start_epoch}")
 
         train_avg_reward = float('-inf')
         best_eval_avg_reward = float('-inf')
@@ -166,18 +166,23 @@ class RLTrainer:
             # ===== UPDATE POLICY PHASE =====
             print("Avg policy loss: ", end='')
             total_policy_loss = 0
-            for i in range(len(states)):
-                # print(states[i])
+            num_minibatches = len(states)
+            while states:
+                state = states.pop(0)
+                action = actions.pop(0).to(self.device)
+                reward = torch.tensor(rewards.pop(0), dtype=torch.float32, device=self.device)
+                old_log_prob = old_log_probs.pop(0).to(self.device)
+
                 policy_loss = self.ppo.update(
-                    states=states[i],
-                    actions=actions[i].to(self.device),
-                    rewards=torch.tensor(rewards[i], dtype=torch.float32, device=self.device),
-                    old_log_probs=old_log_probs[i].to(self.device)
+                    states=state,
+                    actions=action,
+                    rewards=reward,
+                    old_log_probs=old_log_prob
                 )
                 policy_loss = policy_loss.item()
                 print(policy_loss, end=' -> ')
                 total_policy_loss += policy_loss
-            print(total_policy_loss/len(states))
+            print(total_policy_loss/num_minibatches)
             
             if total_reward/count >= train_avg_reward - 0.02:
                 eval_avg_reward = self._evaluate_on_eval_set()
