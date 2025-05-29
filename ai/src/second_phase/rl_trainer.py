@@ -218,6 +218,7 @@ class RLTrainer:
             step = 0
 
             while not done:
+                state.to(self.device)
                 state_input_ids = self._pad_fixed_length([state], self.max_chunk_length, self.tokenizer.pad_token_id).to(self.device)
                 state_attention_mask = (state_input_ids != 0).long().to(self.device)
                 state_inputs = {
@@ -228,18 +229,21 @@ class RLTrainer:
                     action_probs, _, _ = self.actor_critic(state_inputs)
                     dist = torch.distributions.Categorical(action_probs)
                     action = dist.probs.argmax(dim=-1)
-
+                
                 next_state, reward, done = eval_env.step(action, self.tokenizer.pad_token_id)
+                print(reward, end='->')
                 eps_rewards.append(reward)
                 state = next_state
                 step += 1
-                if step > self.k: break
 
-            total_eval_reward += sum(eps_rewards)
             count += 1
-
+            print(sum(eps_rewards))
+            total_eval_reward += sum(eps_rewards)
+            state = eval_env.next_sentence()
+            if state is None: break
+            
         self.actor_critic.train()  # Trở về chế độ training
-
+        del eval_env
         avg_eval_reward = total_eval_reward / count
         print(f"Eval Avg Reward: {avg_eval_reward:.4f}")
         return avg_eval_reward
