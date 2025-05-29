@@ -1,5 +1,5 @@
 project:
-  use_gdrive: True # --------> Use Google Drive for training with RL
+  use_gdrive: False # --------> Use Google Drive for training with RL
 
 data:
   ag_news: "wangrongsheng/ag_news"
@@ -23,8 +23,8 @@ training:
 
 rl_training:
   num_epoch: 1000 # Epoch
-  batch_size: 50 # Batch size = num_data * 4
-  mini_batch_size: 1 # Update policy for each mini batch
+  batch_size: 5000 # Batch size = num_data * 4 ----> 5000
+  mini_batch_size: 256 # Update policy for each mini batch -----> 256
   max_chunk_length: 128 # Sentence length
   learning_rate: 0.00005
   discount_y: 0.95

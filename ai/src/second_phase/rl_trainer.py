@@ -4,10 +4,10 @@ from transformers import BertTokenizer, BertForSequenceClassification
 from torch.optim import AdamW
 from datasets import load_dataset
 from tqdm import tqdm
-from torch.nn.utils.rnn import pad_sequence
 
 from second_phase.environment import TextEnv, split_dataset
 from second_phase.reinforcement_learning import PPO, ActorCritic
+from utils.gdrive import GDrive
 import utils.model_helper as helper
 import second_phase.config as configs
 
@@ -46,10 +46,15 @@ class RLTrainer:
         train_token = self.tokenizer(train_data['text'], padding=True, return_tensors=None)
         self.train_tokens = [torch.tensor(token).to(self.device) for token in train_token['input_ids']]
         self.train_labels = torch.tensor(train_data['label']).to(self.device)
+        eval_data = split_dataset(dataset['test'], samples_per_class=int(self.batch_size*0.25/self.num_classes))
+        eval_token = self.tokenizer(eval_data['text'], padding=True, return_tensors=None)
+        self.eval_tokens = [torch.tensor(token).to(self.device) for token in eval_token['input_ids']]
+        self.eval_labels = torch.tensor(eval_data['label']).to(self.device)
 
         # Clear memory
         del dataset
         del train_data
+        del eval_data
 
     def _init_rl_components(self):
         self.actor_critic = ActorCritic(self.model).to(self.device)
@@ -78,11 +83,21 @@ class RLTrainer:
             reward = r + discount_y * reward
             discounted_rewards.insert(0, reward)  # prepend
         return discounted_rewards
+        
 
-    def train(self):
-        print('Start training...')
-        process = tqdm(range(self.num_epoch))
+    def train(self, from_gdrive=False):
+        print(f"{'='*10} TRAINING LOOP {'='*10}")
+        start_epoch = 0
+        if from_gdrive:
+            best_checkpoint = GDrive().load_model_from_drive(file_name='best_checkpoint.tar', model_dir='actor_critic')
+            self.actor_critic.load_state_dict(state_dict=best_checkpoint['model_state_dict'], strict=False)
+            self.optimizer.load_state_dict(best_checkpoint['optimizer_state_dict'])
+            start_epoch = best_checkpoint['epoch']
+        self.actor_critic.train() # Set train mode
+        print(f"Loaded best_checkpoint.tar from GDrive at epoch {start_epoch}")
 
+        best_eval_avg_reward = float('-inf')
+        process = tqdm(range(start_epoch+1, self.num_epoch))
         for epoch in process:
             states, actions, rewards, old_log_probs = [], [], [], []
             states_batch_input_ids, states_batch_attention_mask, actions_batch, rewards_batch, old_log_probs_batch = [], [], [], [], []
@@ -107,11 +122,11 @@ class RLTrainer:
                         'attention_mask': state_attention_mask
                     }
                     with torch.no_grad():
-                        action_probs, _ = self.actor_critic(state_inputs)
+                        action_probs, _, _ = self.actor_critic(state_inputs)
                         dist = torch.distributions.Categorical(action_probs)
                         action = dist.sample()
                         log_prob = dist.log_prob(action)
-
+                    
                     next_state, reward, done = self.env.step(action, self.tokenizer.pad_token_id)
                     # print(reward, end=f' [{step}]-> ')
                     eps_rewards_list.append(reward)
@@ -162,16 +177,57 @@ class RLTrainer:
                 print(policy_loss, end=' -> ')
                 total_policy_loss += policy_loss
             print(total_policy_loss/len(states))
-            # Save model at each epoch (optional: can use early stopping/best reward logic here)
-            self._save_model(epoch)
+            
+            eval_avg_reward = self._evaluate_on_eval_set()
+            if eval_avg_reward >= best_eval_avg_reward:
+                print('> Saving policy model...')
+                helper.save_checkpoint(
+                    model_dir='actor_critic',
+                    epoch=epoch,
+                    model=self.actor_critic,
+                    optimizer=self.optimizer,
+                    is_the_best=True
+                )
+                if self.config['project']['use_gdrive']: helper.save_best_checkpoint_to_gdrive(model_dir='actor_critic')
+            else:
+                print('Model is not good to save.')
 
-    def _save_model(self, epoch):
-        print('Saving policy model...')
-        helper.save_checkpoint(
-            model_dir='actor_critic',
-            epoch=epoch,
-            model=self.actor_critic,
-            optimizer=self.optimizer,
-            is_the_best=True
-        )
-        if self.config['project']['use_gdrive']: helper.save_best_checkpoint_to_gdrive(model_dir='actor_critic')
+    def _evaluate_on_eval_set(self):
+        print("Evaluating on eval set...")
+        eval_env = TextEnv(self.eval_tokens, self.eval_labels, self.model, self.k, self.device)
+        self.actor_critic.eval() # Set eval mode
+        total_eval_reward = 0.0
+        count = 0
+
+        for idx, state in enumerate(self.eval_tokens):
+            done = False
+            state = state.to(self.device)
+            eps_rewards = []
+            step = 0
+
+            while not done:
+                state_input_ids = self._pad_fixed_length([state], self.max_chunk_length, self.tokenizer.pad_token_id).to(self.device)
+                state_attention_mask = (state_input_ids != 0).long().to(self.device)
+                state_inputs = {
+                    'input_ids': state_input_ids,
+                    'attention_mask': state_attention_mask
+                }
+                with torch.no_grad():
+                    action_probs, _, _ = self.actor_critic(state_inputs)
+                    dist = torch.distributions.Categorical(action_probs)
+                    action = dist.probs.argmax(dim=-1)
+
+                next_state, reward, done = eval_env.step(action, self.tokenizer.pad_token_id)
+                eps_rewards.append(reward)
+                state = next_state
+                step += 1
+                if step > self.k: break
+
+            total_eval_reward += sum(eps_rewards)
+            count += 1
+
+        self.actor_critic.train()  # Trở về chế độ training
+
+        avg_eval_reward = total_eval_reward / count
+        print(f"Eval Avg Reward: {avg_eval_reward:.4f}")
+        return avg_eval_reward

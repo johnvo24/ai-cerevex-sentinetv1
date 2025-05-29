@@ -21,9 +21,9 @@ class ActorCritic(nn.Module):
 
         action_probs = self.softmax(self.actor(cls_token))
         state_values = self.critic(cls_token)
-        # print(action_probs, state_values)
+        pred_label = torch.argmax(output.logits, dim=1)
 
-        return action_probs, state_values
+        return action_probs, state_values, pred_label
 
     def state_dict(self, *args, **kwargs):
         # Lấy toàn bộ state_dict bình thường
@@ -31,6 +31,7 @@ class ActorCritic(nn.Module):
         # Lọc bỏ key liên quan đến self.model
         filtered_dict = {k: v for k, v in full_dict.items() if not k.startswith('model.')}
         return filtered_dict
+
 
 class PPO:
     def __init__(self, actorcritic, optimizer, clip_epsilon=0.2):
@@ -41,7 +42,7 @@ class PPO:
     # Incomplete loss function
     def compute_loss(self, states, actions, rewards, old_log_probs):
         # Forward pass
-        action_probs, state_values = self.actorcritic(states)
+        action_probs, state_values, _ = self.actorcritic(states)
         dist = torch.distributions.Categorical(action_probs)
         new_log_probs = dist.log_prob(actions)
             
