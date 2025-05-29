@@ -10,6 +10,7 @@ from second_phase.reinforcement_learning import PPO, ActorCritic
 from utils.gdrive import GDrive
 import utils.model_helper as helper
 import second_phase.config as configs
+import numpy as np
 
 
 class RLTrainer:
@@ -186,7 +187,7 @@ class RLTrainer:
             
             if total_reward/count >= train_avg_reward - 0.02:
                 eval_avg_reward = self._evaluate_on_eval_set()
-                if eval_avg_reward >= best_eval_avg_reward:
+                if eval_avg_reward > best_eval_avg_reward - 0.2*np.exp(-0.53*(count-1)): # De tai epoch 0 (-0.2) con epoch 10(-0.001)
                     best_eval_avg_reward = eval_avg_reward
                     print('> Saving policy model...')
                     helper.save_checkpoint(
