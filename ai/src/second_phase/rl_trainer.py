@@ -130,7 +130,8 @@ class RLTrainer:
                         log_prob = dist.log_prob(action)
                     
                     next_state, reward, done = self.env.step(action, self.tokenizer.pad_token_id)
-                    # print(reward, end=f' [{step}]-> ')
+                    print(reward, end=f' [{step}]-> ')
+
                     eps_rewards_list.append(reward)
                     eps_reward += reward
                     # Append to minibatch buffer
@@ -144,7 +145,8 @@ class RLTrainer:
 
                 eps_discounted_rewards = self._comput_discounted_rewards(eps_rewards_list, self.discount_y)
                 rewards_batch.extend(eps_discounted_rewards)
-                # print(f"{eps_reward:.2f}")
+                print(f"{eps_reward:.2f}")
+
                 count += 1
                 total_reward += eps_reward
                 process.set_description(f"Epoch {epoch+1}/{self.num_epoch}, [Rollout] Episode {episode+1}/{self.batch_size}, Episode Avg Reward: {total_reward/count:.2f}")
