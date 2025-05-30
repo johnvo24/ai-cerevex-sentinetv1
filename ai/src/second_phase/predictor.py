@@ -54,11 +54,11 @@ class Predictor:
   def predict_full_text(self, sentence):
     self.model.eval()
     chunk = self.tokenizer.encode(sentence, add_special_tokens=True, return_tensors='pt')[0]
-    state_input_ids = self._pad_fixed_length([chunk], self.max_chunk_length, self.tokenizer.pad_token_id).to(self.device)
+    state_input_ids = self._pad_fixed_length([chunk], len(chunk), self.tokenizer.pad_token_id).to(self.device)
     state_attention_mask = (state_input_ids != self.tokenizer.pad_token_id).long().to(self.device)
     state_inputs = {
-        'input_ids': state_input_ids,
-        'attention_mask': state_attention_mask
+      'input_ids': state_input_ids,
+      'attention_mask': state_attention_mask
     }
     torch.cuda.synchronize()
     start_time = time.time()
@@ -69,7 +69,7 @@ class Predictor:
     torch.cuda.synchronize()
     end_time = time.time()
     prediction_time = end_time - start_time
-    return pred_label.item(), prediction_time
+    return sentence, pred_label.item(), prediction_time
   
   # Using batch
   def predict(self, sentence, k=None):
@@ -99,6 +99,7 @@ class Predictor:
     prediction_time = end_time - start_time
 
     ids = torch.nonzero(action == self.action_predict, as_tuple=False)
+    # print(action_probs)
     if len(ids) > 0:
       idx = ids[0].item()
       readed_sentence = self.tokenizer.decode(states[idx], skip_special_tokens=True)

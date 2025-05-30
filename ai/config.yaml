@@ -1,5 +1,5 @@
 project:
-  use_gdrive: False # --------> Use Google Drive for training with RL
+  use_gdrive: True # --------> Use Google Drive for training with RL
 
 data:
   ag_news: "wangrongsheng/ag_news"
