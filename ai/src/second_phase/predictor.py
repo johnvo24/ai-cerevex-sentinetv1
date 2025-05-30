@@ -54,11 +54,11 @@ class Predictor:
   def predict_full_text(self, sentence):
     self.model.eval()
     chunk = self.tokenizer.encode(sentence, add_special_tokens=True, return_tensors='pt')[0]
-    state_input_ids = self._pad_fixed_length([chunk], self.max_chunk_length, self.tokenizer.pad_token_id).to(self.device)
+    state_input_ids = self._pad_fixed_length([chunk], len(chunk), self.tokenizer.pad_token_id).to(self.device)
     state_attention_mask = (state_input_ids != self.tokenizer.pad_token_id).long().to(self.device)
     state_inputs = {
-        'input_ids': state_input_ids,
-        'attention_mask': state_attention_mask
+      'input_ids': state_input_ids,
+      'attention_mask': state_attention_mask
     }
     torch.cuda.synchronize()
     start_time = time.time()

@@ -1,28 +1,48 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.metrics import classification_report
 
 class Comparator():
-    def plot_model_comparison(metric_names, model1_values, model2_values, model1_label="Model 1", model2_label="Model 2"):
-        x = np.arange(len(metric_names))
-        width = 0.35
+    def plot_avg_metrics(avg_accu_rl, avg_pred_time_rl, avg_accu_sft, avg_pred_time_sft, save_path="res/evaluation/rl_avg_metrics_comparison.png"):
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
-        fig, ax = plt.subplots(figsize=(8, 5))
-        bars1 = ax.bar(x - width/2, model1_values, width, label=model1_label, color='skyblue')
-        bars2 = ax.bar(x + width/2, model2_values, width, label=model2_label, color='lightgreen')
-
-        ax.set_ylabel('Giá trị')
-        ax.set_title('So sánh hai mô hình theo các tiêu chí')
-        ax.set_xticks(x)
-        ax.set_xticklabels(metric_names)
-        ax.legend()
-
-        for bar in bars1 + bars2:
+        # Accuracy plot
+        metric_names_acc = ['SFT+RL', 'SFT']
+        values_acc = [avg_accu_rl, avg_accu_sft]
+        bars1 = ax1.bar(metric_names_acc, values_acc, color=['skyblue', 'lightgreen'])
+        ax1.set_title("Accuracy Comparison")
+        ax1.set_ylim(0, 1)
+        for bar in bars1:
             height = bar.get_height()
-            ax.annotate(f'{height}',
+            ax1.annotate(f'{height:.4f}',
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3),
+                        textcoords="offset points",
+                        ha='center', va='bottom')
+
+        # Prediction time plot
+        metric_names_time = ['SFT+RL', 'SFT']
+        values_time = [avg_pred_time_rl, avg_pred_time_sft]
+        bars2 = ax2.bar(metric_names_time, values_time, color=['skyblue', 'lightgreen'])
+        ax2.set_title("Prediction Time Comparison (seconds)")
+        for bar in bars2:
+            height = bar.get_height()
+            ax2.annotate(f'{height:.4f}',
                         xy=(bar.get_x() + bar.get_width() / 2, height),
                         xytext=(0, 3),
                         textcoords="offset points",
                         ha='center', va='bottom')
 
         plt.tight_layout()
-        plt.show()
+        plt.savefig(save_path)
+        plt.close(fig)
+
+    def save_classification_report_as_image(true_labels, pred_labels, target_names=None, save_path="res/evaluation/sft_classification_report.png"):
+        report = classification_report(true_labels, pred_labels, target_names=target_names)
+        print(report)
+        fig = plt.figure(figsize=(10, 6))
+        plt.text(0, 1, report, fontsize=12, family='monospace', verticalalignment='top')
+        plt.axis('off')
+        plt.tight_layout()
+        plt.savefig(save_path)
+        plt.close(fig)
