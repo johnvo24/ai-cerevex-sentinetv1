@@ -99,6 +99,7 @@ class Predictor:
     prediction_time = end_time - start_time
 
     ids = torch.nonzero(action == self.action_predict, as_tuple=False)
+    print(action_probs)
     if len(ids) > 0:
       idx = ids[0].item()
       readed_sentence = self.tokenizer.decode(states[idx], skip_special_tokens=True)
