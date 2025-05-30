@@ -73,3 +73,5 @@ tzdata
 urllib3
 xxhash
 yarl
+uvicorn
+fastapi
