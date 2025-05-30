@@ -1,5 +1,5 @@
 project:
-  use_gdrive: True # --------> Use Google Drive for training with RL
+  use_gdrive: False # --------> Use Google Drive for training with RL
 
 data:
   ag_news: "wangrongsheng/ag_news"
@@ -27,17 +27,17 @@ rl_training:
   mini_batch_size: 256 # Update policy for each mini batch -----> 256
   max_chunk_length: 128 # Sentence length
   learning_rate: 0.00005
-  discount_y: 0.95
+  discount_y: 0.97 # ---> sau 32 step -> buoc dau = 0.05
   clip_ratio: 0.2
   SFT_model_path: "model/checkpoint-22500"
   k: 4 # ----> 4
   action_read: 0
   action_predict: 1
-  penalty_read: -0.01
-  penalty_predict_at_the_end: -0.5
-  penalty_predict: -1
+  penalty_read: -0.025 # *32 = ~-0.8 -> doc den cuoi du doan dung => reward = 0
+  penalty_predict_at_the_end: -0.2
+  penalty_predict: -0.2
   reward_predict: 1
-  reward_predict_at_the_end: 0.5
+  reward_predict_at_the_end: 1
 
 logging:
   log_dir: "log/"
