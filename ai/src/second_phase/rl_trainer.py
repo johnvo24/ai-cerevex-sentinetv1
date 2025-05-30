@@ -125,12 +125,19 @@ class RLTrainer:
                     }
                     with torch.no_grad():
                         action_probs, _, _ = self.actor_critic(state_inputs)
-                        dist = torch.distributions.Categorical(action_probs)
+                        temperature = 1 + 0.5*np.exp(-0.3556*epoch)
+                        if temperature > 1.01:
+                            logits = torch.log(action_probs + 1e-8)  # tránh log(0)
+                            scaled_logits = logits / temperature
+                            scaled_action_probs = torch.softmax(scaled_logits, dim=-1)
+                            dist = torch.distributions.Categorical(probs=scaled_action_probs)
+                        else:
+                            dist = torch.distributions.Categorical(action_probs)
                         action = dist.sample()
                         log_prob = dist.log_prob(action)
                     
                     next_state, reward, done = self.env.step(action, self.tokenizer.pad_token_id)
-                    print(reward, end=f' [{step}]-> ')
+                    # print(reward, end=f' [{step}]-> ')
 
                     eps_rewards_list.append(reward)
                     eps_reward += reward
@@ -145,7 +152,7 @@ class RLTrainer:
 
                 eps_discounted_rewards = self._comput_discounted_rewards(eps_rewards_list, self.discount_y)
                 rewards_batch.extend(eps_discounted_rewards)
-                print(f"{eps_reward:.2f}")
+                # print(f"{eps_reward:.2f}")
 
                 count += 1
                 total_reward += eps_reward

@@ -11,7 +11,7 @@ class CerevexSentinet():
 
     def train():
         trainer = RLTrainer()
-        trainer.train(from_gdrive=True)
+        trainer.train(from_gdrive=False)
 
     def predict(sentence):
         predictor = Predictor()
