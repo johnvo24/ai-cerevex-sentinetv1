@@ -1,10 +1,10 @@
 from psycopg import AsyncConnection
-from schemas.users import UserCreate, UserUpdate, UserResponse
-from models.helper import hash_pw
+from schemas.users import UserCreate, UserLogin, UserUpdate, UserResponse
+from models.helper import hash_pw, verify_password
 
 async def create_user(conn: AsyncConnection, user: UserCreate):
     query = """
-        INSERT INTO Users (username, password, name, email)
+        INSERT INTO users (username, password, name, email)
         VALUES (%s, %s, %s, %s)
         RETURNING id, username, name, email, created_at
     """
@@ -26,6 +26,21 @@ async def get_user_by_id(conn: AsyncConnection, user_id: int):
                 id=row[0], username=row[1], name=row[2],
                 email=row[3], created_at=row[4]
             )
+
+async def login(conn: AsyncConnection, data: UserLogin):
+    query = "SELECT id, username, name, email, password, created_at FROM Users WHERE username = %s"
+    async with conn.cursor() as cur:
+        await cur.execute(query, (data.username,))
+        row = await cur.fetchone()
+        if row:
+            stored_hashed_pw = row[4]
+            if verify_password(data.password, stored_hashed_pw):
+                return UserResponse(
+                    id=row[0], username=row[1], name=row[2],
+                    email=row[3], created_at=row[5]
+                )
+    return None
+
 
 async def get_all_users(conn: AsyncConnection):
     query = "SELECT id, username, name, email, created_at FROM Users"

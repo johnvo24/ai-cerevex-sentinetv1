@@ -3,8 +3,8 @@ version: '3.9'
 services:
   backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: fastapi-backend
     ports:
       - "8000:8000"
@@ -14,6 +14,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/sentimentv1
     depends_on:
       - db
+    command: sh -c "until pg_isready -h db -p 5432; do echo Waiting for PostgreSQL...; sleep 2; done; uvicorn main:app --host 0.0.0.0 --port 8000"
 
   db:
     image: postgres:16
@@ -27,6 +28,7 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./backend/res/database.sql:/docker-entrypoint-initdb.d/database.sql:ro
 
 volumes:
   pgdata:
