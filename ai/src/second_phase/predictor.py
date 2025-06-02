@@ -72,68 +72,68 @@ class Predictor:
     return sentence, pred_label.item(), prediction_time
   
   # Using batch
-  def predict(self, sentence, k=None):
-    self.actor_critic.eval()
-    
-    chunk = self.tokenizer.encode(sentence, add_special_tokens=True, return_tensors='pt')[0]
-    _k = self.k if not k else k
-    states = []
-    for ids in range(0, len(chunk), _k):
-      state = chunk[:ids+_k]
-      states.append(state)
-
-    state_input_ids = self._pad_fixed_length(states, len(chunk), self.tokenizer.pad_token_id).to(self.device)
-    state_attention_mask = (state_input_ids != self.tokenizer.pad_token_id).long().to(self.device)
-    state_inputs = {
-        'input_ids': state_input_ids,
-        'attention_mask': state_attention_mask
-    }
-
-    torch.cuda.synchronize()
-    start_time = time.time()
-    with torch.no_grad():
-      action_probs, _, pred_labels = self.actor_critic(state_inputs)
-      action = torch.argmax(action_probs, dim=1)
-    torch.cuda.synchronize()
-    end_time = time.time()
-    prediction_time = end_time - start_time
-
-    ids = torch.nonzero(action == self.action_predict, as_tuple=False)
-    # print(action_probs)
-    if len(ids) > 0:
-      idx = ids[0].item()
-      readed_sentence = self.tokenizer.decode(states[idx], skip_special_tokens=True)
-      pred_label = pred_labels[idx].item()
-    else:
-      readed_sentence = self.tokenizer.decode(states[-1], skip_special_tokens=True)
-      pred_label = pred_labels[-1].item()
-
-    return readed_sentence, pred_label, prediction_time
-
-
   # def predict(self, sentence, k=None):
   #   self.actor_critic.eval()
-  #   prediction_time = 0.0
+    
   #   chunk = self.tokenizer.encode(sentence, add_special_tokens=True, return_tensors='pt')[0]
   #   _k = self.k if not k else k
+  #   states = []
   #   for ids in range(0, len(chunk), _k):
   #     state = chunk[:ids+_k]
-  #     state_input_ids = self._pad_fixed_length([state], self.max_chunk_length, self.tokenizer.pad_token_id).to(self.device)
-  #     state_attention_mask = (state_input_ids != self.tokenizer.pad_token_id).long().to(self.device)
-  #     state_inputs = {
-  #         'input_ids': state_input_ids,
-  #         'attention_mask': state_attention_mask
-  #     }
-  #     torch.cuda.synchronize()
-  #     start_time = time.time()
-  #     with torch.no_grad():
-  #       action_probs, _, pred_label = self.actor_critic(state_inputs)
-  #       action = torch.argmax(action_probs, dim=1)
-  #     torch.cuda.synchronize()
-  #     end_time = time.time()
-  #     prediction_time += (end_time - start_time)
-  #     if len(state) == len(chunk):
-  #       return sentence, pred_label.item(), prediction_time
-  #     if action.item() == self.action_predict:
-  #       readed_sentence = self.tokenizer.decode(state, skip_special_tokens=True)
-  #       return readed_sentence, pred_label.item(), prediction_time
+  #     states.append(state)
+
+  #   state_input_ids = self._pad_fixed_length(states, len(chunk), self.tokenizer.pad_token_id).to(self.device)
+  #   state_attention_mask = (state_input_ids != self.tokenizer.pad_token_id).long().to(self.device)
+  #   state_inputs = {
+  #       'input_ids': state_input_ids,
+  #       'attention_mask': state_attention_mask
+  #   }
+
+  #   torch.cuda.synchronize()
+  #   start_time = time.time()
+  #   with torch.no_grad():
+  #     action_probs, _, pred_labels = self.actor_critic(state_inputs)
+  #     action = torch.argmax(action_probs, dim=1)
+  #   torch.cuda.synchronize()
+  #   end_time = time.time()
+  #   prediction_time = end_time - start_time
+
+  #   ids = torch.nonzero(action == self.action_predict, as_tuple=False)
+  #   # print(action_probs)
+  #   if len(ids) > 0:
+  #     idx = ids[0].item()
+  #     readed_sentence = self.tokenizer.decode(states[idx], skip_special_tokens=True)
+  #     pred_label = pred_labels[idx].item()
+  #   else:
+  #     readed_sentence = self.tokenizer.decode(states[-1], skip_special_tokens=True)
+  #     pred_label = pred_labels[-1].item()
+
+  #   return readed_sentence, pred_label, prediction_time
+
+
+  def predict(self, sentence, k=None):
+    self.actor_critic.eval()
+    prediction_time = 0.0
+    chunk = self.tokenizer.encode(sentence, add_special_tokens=True, return_tensors='pt')[0]
+    _k = self.k if not k else k
+    for ids in range(0, len(chunk), _k):
+      state = chunk[:ids+_k]
+      state_input_ids = self._pad_fixed_length([state], self.max_chunk_length, self.tokenizer.pad_token_id).to(self.device)
+      state_attention_mask = (state_input_ids != self.tokenizer.pad_token_id).long().to(self.device)
+      state_inputs = {
+          'input_ids': state_input_ids,
+          'attention_mask': state_attention_mask
+      }
+      torch.cuda.synchronize()
+      start_time = time.time()
+      with torch.no_grad():
+        action_probs, _, pred_label = self.actor_critic(state_inputs)
+        action = torch.argmax(action_probs, dim=1)
+      torch.cuda.synchronize()
+      end_time = time.time()
+      prediction_time += (end_time - start_time)
+      if len(state) == len(chunk):
+        return sentence, pred_label.item(), prediction_time
+      if action.item() == self.action_predict:
+        readed_tokens = [tok for tok in state if tok != self.tokenizer.pad_token_id]
+        return readed_tokens, pred_label.item(), prediction_time

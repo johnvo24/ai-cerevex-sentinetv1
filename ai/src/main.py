@@ -30,37 +30,48 @@ class CerevexSentinet():
         predictor = Predictor()
         total_pred_time_rl = 0
         correct_pred_rl = 0
+        readed_token_rl=0
         total_pred_time_sft = 0
         correct_pred_sft = 0
+        readed_token_sft=0
         for row in tqdm(dataset, desc="Evaluating"):
-            readed_sentence_1, pred_label_1, prediction_time_1 = predictor.predict(sentence=row['text'], k=512)
+            readed_tokens_1, pred_label_1, prediction_time_1 = predictor.predict(sentence=row['text'], k=16)
             total_pred_time_rl += prediction_time_1
+            readed_token_rl += len(readed_tokens_1)
             if (pred_label_1 == row['label']): correct_pred_rl += 1
-            readed_sentence_2, pred_label_2, prediction_time_2 = predictor.predict_full_text(sentence=row['text'])
+
+            readed_tokens_2, pred_label_2, prediction_time_2 = predictor.predict_full_text(sentence=row['text'])
             total_pred_time_sft += prediction_time_2
+            readed_token_sft += len(readed_tokens_2)
             if (pred_label_2 == row['label']): correct_pred_sft += 1
 
         num_samples = len(dataset)
 
         avg_accu_rl = correct_pred_rl / num_samples
+        avg_readed_token_rl = readed_token_rl / num_samples
         avg_pred_time_rl = total_pred_time_rl / num_samples
         avg_accu_sft = correct_pred_sft / num_samples
+        avg_readed_token_sft = readed_token_sft / num_samples
         avg_pred_time_sft = total_pred_time_sft / num_samples
 
         print("\n=== Evaluation Results ===")
         print(f"SFT + RL:")
-        print(f"- Accuracy:           {avg_accu_rl:.4f}")
+        print(f"- Accuracy:            {avg_accu_rl:.4f}")
+        print(f"- Avg Readed Tokens:   {avg_readed_token_rl:.4f}")
         print(f"- Avg Prediction Time: {avg_pred_time_rl:.4f} seconds")
 
         print(f"\nSFT only:")
-        print(f"- Accuracy:           {avg_accu_sft:.4f}")
+        print(f"- Accuracy:            {avg_accu_sft:.4f}")
+        print(f"- Avg Readed Tokens:   {avg_readed_token_sft:.4f}")
         print(f"- Avg Prediction Time: {avg_pred_time_sft:.4f} seconds")
 
         Comparator.plot_avg_metrics(
             avg_accu_rl,
             avg_pred_time_rl,
+            avg_readed_token_rl,
             avg_accu_sft,
-            avg_pred_time_sft
+            avg_pred_time_sft,
+            avg_readed_token_sft
         )
 
     def evaluate_sft():
@@ -73,7 +84,7 @@ class CerevexSentinet():
 
         for row in tqdm(dataset, desc="Evaluating SFT model"):
             true_labels.append(row['label'])
-            _, pred_label, _ = predictor.predict_full_text(sentence=row['text'])
+            _, pred_label, _ = predictor.predict_full_text(sentrl_avg_metrics_comparisonence=row['text'])
             pred_labels.append(pred_label)
 
         target_names = ['World', 'Sports', 'Business', 'Sci/Tech']  # ví dụ 4 class của AG News

@@ -1,8 +1,18 @@
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 from pydantic import BaseModel
 from second_phase.predictor import Predictor
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 predictor = Predictor()
 
 class Content(BaseModel):
@@ -16,7 +26,8 @@ async def predict(input: Content):
     output: {"label": "world|sports|business|sci/tech", "pred_time": 0.2343}
     '''
     labels = ["World", "Sports", "Business", "Cri/Tech"]
-    _, pred_label, pred_time = predictor.predict_full_text(sentence=input.content)
+    readed_sentence, pred_label, pred_time = predictor.predict_full_text(sentence=input.content)
+    print(readed_sentence)
 
     return {"label": labels[pred_label], "pred_time": pred_time}
 
